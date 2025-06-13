@@ -16,9 +16,18 @@ import (
 
 const (
 	uploadDir   = "./uploads"
-	maxFileSize = 25 * 1024 * 1024 // 25MB
-	fileExpiry  = 1 * time.Hour    // 1 jam
+	maxFileSize = 100 * 1024 * 1024 // 100MB
+	fileExpiry  = 1 * time.Hour     // 1 jam
 )
+
+// getPort returns the port from environment variable or default
+func getPort() string {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+	return ":" + port
+}
 
 func main() {
 	// Buat direktori uploads jika belum ada
@@ -43,8 +52,9 @@ func main() {
 	go startCleanupRoutine()
 
 	// Start server
-	log.Println("Server started on :3000")
-	log.Fatal(app.Listen(":3000"))
+	port := getPort()
+	log.Printf("Server started on %s", port)
+	log.Fatal(app.Listen(port))
 }
 
 // Handler untuk upload file
@@ -60,21 +70,21 @@ func uploadFile(c *fiber.Ctx) error {
 	// Cek ukuran file
 	if file.Size > maxFileSize {
 		return c.Status(400).JSON(fiber.Map{
-			"error": "File size exceeds 25MB limit",
+			"error": "File size exceeds 100MB limit",
 		})
 	}
 
 	// Generate nama file berdasarkan unix timestamp (sekarang + 1 jam) + ekstensi
 	expiryTime := time.Now().Add(fileExpiry)
-	
+
 	// Ambil ekstensi dari file asli
 	originalExt := filepath.Ext(file.Filename)
 	if originalExt == "" {
 		originalExt = ".bin" // default extension jika tidak ada
 	}
-	
+
 	filename := strconv.FormatInt(expiryTime.Unix(), 10) + originalExt
-	
+
 	// Simpan file dengan nama unix timestamp + ekstensi
 	filePath := filepath.Join(uploadDir, filename)
 	if err := c.SaveFile(file, filePath); err != nil {
@@ -84,12 +94,12 @@ func uploadFile(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"message":      "File uploaded successfully",
-		"filename":     filename,
+		"message":       "File uploaded successfully",
+		"filename":      filename,
 		"original_name": file.Filename,
-		"size":         file.Size,
-		"expires_at":   expiryTime.Format(time.RFC3339),
-		"download_url": fmt.Sprintf("/%s", filename),
+		"size":          file.Size,
+		"expires_at":    expiryTime.Format(time.RFC3339),
+		"download_url":  fmt.Sprintf("/%s", filename),
 	})
 }
 

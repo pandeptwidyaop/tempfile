@@ -39,9 +39,12 @@ go mod tidy
 
 # Run the application
 go run main.go
+
+# Or with custom port
+PORT=8080 go run main.go
 ```
 
-The server will start on `http://localhost:3000` 🎉
+The server will start on `http://localhost:3000` (or your specified port) 🎉
 
 ## 📚 API Documentation
 
@@ -83,7 +86,23 @@ curl -O http://localhost:3000/1718270400.pdf
 
 ## 🛠️ Configuration
 
-You can customize the application by modifying these constants in `main.go`:
+You can customize the application using environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Server port |
+
+Example:
+```bash
+# Set custom port
+export PORT=8080
+go run main.go
+
+# Or inline
+PORT=8080 go run main.go
+```
+
+You can also modify these constants in `main.go`:
 
 ```go
 const (
@@ -95,25 +114,40 @@ const (
 
 ## 🐳 Docker Support
 
-```dockerfile
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go mod tidy && go build -o tempfile
+### Using Docker
 
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
-COPY --from=builder /app/tempfile .
-EXPOSE 3000
-CMD ["./tempfile"]
-```
-
-Build and run:
 ```bash
+# Build the image
 docker build -t tempfile .
+
+# Run with default port (3000)
 docker run -p 3000:3000 tempfile
+
+# Run with custom port
+docker run -p 8080:8080 -e PORT=8080 tempfile
+
+# Run with volume for persistent uploads directory
+docker run -p 3000:3000 -v $(pwd)/uploads:/app/uploads tempfile
 ```
+
+### Using Docker Compose
+
+```bash
+# Start the service
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the service
+docker-compose down
+```
+
+The `docker-compose.yml` includes:
+- Health checks
+- Volume mounting for uploads
+- Restart policies
+- Traefik labels (for reverse proxy)
 
 ## 🌟 Use Cases
 
