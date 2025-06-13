@@ -1,0 +1,105 @@
+{{define "success.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - TempFiles</title>
+    <meta name="description" content="Fast, secure temporary file sharing. Upload files up to 100MB that automatically expire after 1 hour.">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📁</text></svg>">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- Meta tags for social sharing -->
+    <meta property="og:title" content="{{.Title}} - TempFiles">
+    <meta property="og:description" content="Fast, secure temporary file sharing">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    
+    <!-- Security headers -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+</head>
+<body data-theme="{{.Theme}}">
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" title="Toggle theme">🌙</button>
+    
+    <!-- Main Content -->
+    <div class="container">
+        <div class="success-container fade-in">
+            <!-- Success Header -->
+            <div class="header">
+                <div class="success-icon">✅</div>
+                <div class="logo">Upload Successful!</div>
+                <div class="subtitle">Your file has been uploaded and is ready to share</div>
+            </div>
+            
+            <!-- File Info Card -->
+            <div class="card">
+                <h3 style="margin-bottom: 1rem;">📄 File Information</h3>
+                <div style="display: grid; gap: 1rem;">
+                    <div>
+                        <strong>Original Name:</strong>
+                        <div style="font-family: monospace; margin-top: 0.25rem;">{{.OriginalName}}</div>
+                    </div>
+                    <div>
+                        <strong>File Size:</strong>
+                        <div>{{.SizeHuman}}</div>
+                    </div>
+                    <div>
+                        <strong>Expires In:</strong>
+                        <div>{{.ExpiresIn}}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Download Section -->
+            <div class="download-section">
+                <h3 style="margin-bottom: 1rem;">🔗 Download Link</h3>
+                <div class="download-link">{{.BaseURL}}/{{.Filename}}</div>
+                <div style="margin-top: 1rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <a href="/{{.Filename}}" class="btn" target="_blank">
+                        📥 Download File
+                    </a>
+                    <button class="btn copy-btn" data-text="{{.BaseURL}}/{{.Filename}}">
+                        📋 Copy Link
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Countdown Timer -->
+            <div class="countdown" data-expiry="{{.ExpiresAt}}">
+                <div style="margin-bottom: 0.5rem;">⏰ Time Remaining</div>
+                <div class="countdown-time">Loading...</div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="card">
+                <div style="text-align: center;">
+                    <a href="/" class="btn btn-secondary">
+                        📁 Upload Another File
+                    </a>
+                </div>
+            </div>
+            
+            <!-- QR Code Section (Future Feature) -->
+            <div class="card" style="text-align: center;">
+                <h3 style="margin-bottom: 1rem;">📱 Share on Mobile</h3>
+                <div style="padding: 2rem; background: rgba(0,0,0,0.05); border-radius: 8px; margin: 1rem 0;">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">📱</div>
+                    <div>QR Code feature coming soon!</div>
+                    <div style="font-size: 0.9rem; opacity: 0.7; margin-top: 0.5rem;">Scan to download on mobile devices</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+{{end}}

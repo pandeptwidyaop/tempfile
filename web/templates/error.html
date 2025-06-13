@@ -1,0 +1,76 @@
+{{define "error.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - TempFiles</title>
+    <meta name="description" content="Fast, secure temporary file sharing. Upload files up to 100MB that automatically expire after 1 hour.">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📁</text></svg>">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- Meta tags for social sharing -->
+    <meta property="og:title" content="{{.Title}} - TempFiles">
+    <meta property="og:description" content="Fast, secure temporary file sharing">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    
+    <!-- Security headers -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+</head>
+<body data-theme="{{.Theme}}">
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" title="Toggle theme">🌙</button>
+    
+    <!-- Main Content -->
+    <div class="container">
+        <div class="fade-in">
+            <!-- Error Header -->
+            <div class="header">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">❌</div>
+                <div class="logo">{{.ErrorTitle}}</div>
+                <div class="subtitle">{{.ErrorMessage}}</div>
+            </div>
+            
+            <!-- Error Details -->
+            <div class="card">
+                <div class="alert alert-error" style="display: block;">
+                    <strong>Error:</strong> {{.ErrorDetail}}
+                </div>
+                
+                <div style="text-align: center; margin-top: 2rem;">
+                    <a href="/" class="btn">
+                        🏠 Back to Home
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Help Section -->
+            <div class="card">
+                <h3 style="margin-bottom: 1rem;">💡 Need Help?</h3>
+                <div style="display: grid; gap: 1rem;">
+                    <div>
+                        <strong>File Size Limit:</strong> Maximum 100MB per file
+                    </div>
+                    <div>
+                        <strong>File Expiry:</strong> Files are automatically deleted after 1 hour
+                    </div>
+                    <div>
+                        <strong>Supported Formats:</strong> All file types are supported
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+{{end}}

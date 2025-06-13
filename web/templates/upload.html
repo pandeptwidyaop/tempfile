@@ -1,0 +1,118 @@
+{{define "upload.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - TempFiles</title>
+    <meta name="description" content="Fast, secure temporary file sharing. Upload files up to 100MB that automatically expire after 1 hour.">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📁</text></svg>">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- Meta tags for social sharing -->
+    <meta property="og:title" content="{{.Title}} - TempFiles">
+    <meta property="og:description" content="Fast, secure temporary file sharing">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    
+    <!-- Security headers -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+</head>
+<body data-theme="{{.Theme}}">
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" title="Toggle theme">🌙</button>
+    
+    <!-- Main Content -->
+    <div class="container">
+        <div class="fade-in">
+            <!-- Header -->
+            <div class="header">
+                <div class="logo">📁 TempFiles</div>
+                <div class="subtitle">Fast, secure temporary file sharing</div>
+                <p>Upload files up to 100MB that automatically expire after {{.FileExpiryHours}} hour{{if ne .FileExpiryHours 1}}s{{end}}</p>
+            </div>
+            
+            <!-- Alert Container -->
+            <div class="alert"></div>
+            
+            <!-- Upload Section -->
+            <div class="card">
+                <form id="uploadForm" action="/" method="POST" enctype="multipart/form-data">
+                    <!-- Upload Area -->
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">📁</div>
+                        <div class="upload-text">Drop files here or click to browse</div>
+                        <div class="upload-subtext">Maximum file size: {{.MaxFileSizeHuman}}</div>
+                        <input type="file" id="fileInput" name="file" accept="*/*">
+                    </div>
+                    
+                    <!-- File Info -->
+                    <div class="file-info">
+                        <div class="file-name"></div>
+                        <div class="file-size"></div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="progress-text">Ready to upload...</div>
+                    </div>
+                    
+                    <!-- Upload Button -->
+                    <div style="text-align: center; margin-top: 1.5rem;">
+                        <button type="submit" class="btn">
+                            🚀 Upload File
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Features -->
+            <div class="card">
+                <h3 style="margin-bottom: 1rem; text-align: center;">✨ Features</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; text-align: center;">
+                    <div>
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">⚡</div>
+                        <div style="font-weight: 500;">Lightning Fast</div>
+                        <div style="font-size: 0.9rem; opacity: 0.7;">Built with Go & Fiber</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔒</div>
+                        <div style="font-weight: 500;">Auto-Expiry</div>
+                        <div style="font-size: 0.9rem; opacity: 0.7;">Files deleted after {{.FileExpiryHours}}h</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📱</div>
+                        <div style="font-weight: 500;">Cross-Platform</div>
+                        <div style="font-size: 0.9rem; opacity: 0.7;">Works everywhere</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- API Info -->
+            <div class="card">
+                <h3 style="margin-bottom: 1rem;">🔗 API Usage</h3>
+                <p style="margin-bottom: 1rem;">You can also upload files programmatically:</p>
+                <div style="background: rgba(0,0,0,0.1); padding: 1rem; border-radius: 6px; font-family: monospace; font-size: 0.9rem; overflow-x: auto;">
+                    <div>curl -X POST -F "file=@example.pdf" {{.BaseURL}}/</div>
+                </div>
+                <div style="margin-top: 1rem; text-align: center;">
+                    <a href="/health" class="btn btn-secondary">📊 API Health</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+{{end}}
