@@ -1,6 +1,6 @@
 # 🚀 TempFiles - Temporary File Upload Service
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=for-the-badge&logo=go)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go)](https://golang.org/)
 [![Fiber](https://img.shields.io/badge/Fiber-v2-00ADD8?style=for-the-badge&logo=fiber)](https://gofiber.io/)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 [![Contributors](https://img.shields.io/github/contributors/pandeptwidyaop/tempfile?style=for-the-badge)](https://github.com/pandeptwidyaop/tempfile/graphs/contributors)
@@ -24,7 +24,7 @@ A **lightning-fast** ⚡ temporary file upload service built with Go and Fiber. 
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.24 or higher
 - Git
 
 ### Installation
@@ -85,6 +85,16 @@ curl -O http://localhost:3000/1718270400.pdf
 - `400` - Invalid filename format
 
 ## 🛠️ Configuration
+
+### Go Version Update
+
+This project now requires **Go 1.24** for the latest features and performance improvements. To check your Go version:
+
+```bash
+go version
+```
+
+To update Go to version 1.24, visit [golang.org/dl](https://golang.org/dl/) or use your package manager.
 
 You can customize the application using environment variables:
 
