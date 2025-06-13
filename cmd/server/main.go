@@ -36,10 +36,19 @@ func main() {
 	cleanupService := services.NewCleanupService(cfg)
 
 	var templateService *services.TemplateService
+	var staticService *services.StaticService
+
 	if cfg.EnableWebUI {
+		// Initialize template service with embedded templates
 		templateService = services.NewTemplateService(cfg)
 		if err := templateService.Initialize(); err != nil {
-			log.Fatal("Failed to initialize templates:", err)
+			log.Fatal("Failed to initialize embedded templates:", err)
+		}
+
+		// Initialize static service with hybrid loading
+		staticService, err = services.NewStaticService(cfg)
+		if err != nil {
+			log.Fatal("Failed to initialize static service:", err)
 		}
 	}
 
@@ -58,7 +67,7 @@ func main() {
 	})
 
 	// Setup middleware
-	setupMiddleware(app, cfg)
+	setupMiddleware(app, cfg, staticService)
 
 	// Setup routes
 	setupRoutes(app, cfg, apiHandler, webHandler, fileHandler)
@@ -75,7 +84,7 @@ func main() {
 }
 
 // setupMiddleware configures middleware based on configuration
-func setupMiddleware(app *fiber.App, cfg *config.Config) {
+func setupMiddleware(app *fiber.App, cfg *config.Config, staticService *services.StaticService) {
 	// Conditionally add middleware based on config
 	if cfg.EnableLogging {
 		app.Use(logger.New(logger.Config{
@@ -93,9 +102,10 @@ func setupMiddleware(app *fiber.App, cfg *config.Config) {
 		app.Use(corsConfig)
 	}
 
-	// Serve static files if Web UI is enabled
-	if cfg.EnableWebUI {
-		app.Static("/static", cfg.StaticDir)
+	// Serve embedded static files if Web UI is enabled
+	if cfg.EnableWebUI && staticService != nil {
+		app.Get("/static/*", staticService.Handler())
+		log.Println("✅ Embedded static files configured at /static/*")
 	}
 }
 
@@ -132,5 +142,8 @@ func printStartupInfo(cfg *config.Config) {
 	log.Printf("   CORS Enabled: %v", cfg.EnableCORS)
 	log.Printf("   Logging Enabled: %v", cfg.EnableLogging)
 	log.Printf("   Web UI Enabled: %v", cfg.EnableWebUI)
+	if cfg.EnableWebUI {
+		log.Printf("   Static Assets: Embedded (standalone binary)")
+	}
 	log.Printf("   Debug Mode: %v", cfg.Debug)
 }

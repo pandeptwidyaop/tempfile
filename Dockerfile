@@ -33,14 +33,12 @@ RUN addgroup -g 1001 -S tempfile && \
 WORKDIR /app
 
 # Create uploads directory with proper permissions
-RUN mkdir -p uploads web/static web/templates && \
+# Note: We no longer need web/static and web/templates as they're embedded
+RUN mkdir -p uploads && \
     chown -R tempfile:tempfile /app
 
-# Copy binary from builder stage
+# Copy binary from builder stage (now contains embedded assets)
 COPY --from=builder --chown=tempfile:tempfile /app/tempfile .
-
-# Copy web assets
-COPY --from=builder --chown=tempfile:tempfile /app/web ./web
 
 # Switch to non-root user
 USER tempfile
@@ -57,6 +55,7 @@ ENV PORT=3000
 ENV APP_ENV=production
 ENV DEBUG=false
 ENV PUBLIC_URL=http://localhost:3000
+ENV ENABLE_WEB_UI=true
 
-# Run the application
+# Run the application (now fully standalone with embedded assets)
 CMD ["./tempfile"]

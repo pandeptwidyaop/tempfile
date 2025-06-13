@@ -132,6 +132,27 @@ body[data-theme="light"] .card {
   display: none;
 }
 
+/* Remove text decoration from all links and buttons */
+a, button, .btn {
+  text-decoration: none !important;
+}
+
+a:hover, a:focus, a:active, a:visited {
+  text-decoration: none !important;
+}
+
+/* Ensure button-styled links look like buttons */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none !important;
+}
+
+a.btn:hover {
+  text-decoration: none !important;
+}
+
 /* Button */
 .btn {
   background: var(--primary-color);

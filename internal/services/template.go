@@ -1,9 +1,12 @@
 package services
 
 import (
+	"embed"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -12,26 +15,71 @@ import (
 	"github.com/pandeptwidyaop/tempfile/internal/models"
 )
 
-// TemplateService handles HTML template rendering
+// Embed templates at compile time
+// go:embed ../../web/templates/*.html
+var templateFiles embed.FS
+
+// TemplateService handles HTML template rendering with hybrid loading
 type TemplateService struct {
-	config    *config.Config
-	templates *template.Template
+	config          *config.Config
+	templates       *template.Template
+	useFileSystem   bool
 }
 
-// NewTemplateService creates a new template service instance
+// NewTemplateService creates a new template service instance with hybrid loading
 func NewTemplateService(cfg *config.Config) *TemplateService {
 	return &TemplateService{
 		config: cfg,
 	}
 }
 
-// Initialize initializes HTML templates
+// Initialize initializes HTML templates with hybrid loading (filesystem first, then embedded)
 func (s *TemplateService) Initialize() error {
-	templatePattern := filepath.Join(s.config.TemplatesDir, "*.html")
-	tmpl, err := template.ParseGlob(templatePattern)
-	if err != nil {
-		return fmt.Errorf("failed to parse templates: %w", err)
+	// Determine if we should use filesystem or embedded templates
+	s.useFileSystem = s.config.Debug || os.Getenv("USE_FILESYSTEM_ASSETS") == "true"
+
+	var tmpl *template.Template
+	var err error
+
+	// Try filesystem first if enabled
+	if s.useFileSystem {
+		if _, statErr := os.Stat(s.config.TemplatesDir); os.IsNotExist(statErr) {
+			log.Printf("⚠️  Templates directory %s not found, falling back to embedded templates", s.config.TemplatesDir)
+			s.useFileSystem = false
+		} else {
+			// Load from filesystem
+			templatePattern := filepath.Join(s.config.TemplatesDir, "*.html")
+			tmpl, err = template.ParseGlob(templatePattern)
+			if err != nil {
+				log.Printf("⚠️  Failed to load templates from filesystem: %v, falling back to embedded", err)
+				s.useFileSystem = false
+			} else {
+				log.Printf("🔧 Development mode: Loading templates from %s", s.config.TemplatesDir)
+			}
+		}
 	}
+
+	// If filesystem failed or not enabled, use embedded templates
+	if !s.useFileSystem || tmpl == nil {
+		// Try to get templates subdirectory from embedded files
+		templatesFS, err := fs.Sub(templateFiles, "web/templates")
+		if err != nil {
+			// If sub fails, use the full embedded FS and parse with full paths
+			tmpl, err = template.ParseFS(templateFiles, "web/templates/*.html")
+			if err != nil {
+				return fmt.Errorf("failed to parse embedded templates: %w", err)
+			}
+			log.Println("✅ Production mode: Templates loaded from embedded files (full path)")
+		} else {
+			// Parse templates from subdirectory
+			tmpl, err = template.ParseFS(templatesFS, "*.html")
+			if err != nil {
+				return fmt.Errorf("failed to parse embedded templates from subdirectory: %w", err)
+			}
+			log.Println("✅ Production mode: Templates loaded from embedded files")
+		}
+	}
+
 	s.templates = tmpl
 	return nil
 }
@@ -39,6 +87,13 @@ func (s *TemplateService) Initialize() error {
 // Render renders an HTML template
 func (s *TemplateService) Render(c *fiber.Ctx, templateName string, data interface{}) error {
 	c.Set("Content-Type", "text/html")
+
+	// In development mode with filesystem templates, reload templates on each request
+	if s.useFileSystem && s.config.Debug {
+		if err := s.reloadTemplatesIfNeeded(); err != nil {
+			log.Printf("Warning: Failed to reload templates: %v", err)
+		}
+	}
 
 	// Create a buffer to render the template
 	var buf strings.Builder
@@ -49,6 +104,30 @@ func (s *TemplateService) Render(c *fiber.Ctx, templateName string, data interfa
 	}
 
 	return c.SendString(buf.String())
+}
+
+// reloadTemplatesIfNeeded reloads templates from filesystem in development mode
+func (s *TemplateService) reloadTemplatesIfNeeded() error {
+	if !s.useFileSystem {
+		return nil
+	}
+
+	templatePattern := filepath.Join(s.config.TemplatesDir, "*.html")
+	tmpl, err := template.ParseGlob(templatePattern)
+	if err != nil {
+		return err
+	}
+
+	s.templates = tmpl
+	return nil
+}
+
+// GetMode returns the current loading mode
+func (s *TemplateService) GetMode() string {
+	if s.useFileSystem {
+		return "filesystem"
+	}
+	return "embedded"
 }
 
 // RenderUploadPage renders the upload page
