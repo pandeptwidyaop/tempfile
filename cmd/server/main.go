@@ -10,6 +10,8 @@ import (
 
 	"github.com/pandeptwidyaop/tempfile/internal/config"
 	"github.com/pandeptwidyaop/tempfile/internal/handlers"
+	"github.com/pandeptwidyaop/tempfile/internal/middleware"
+	"github.com/pandeptwidyaop/tempfile/internal/ratelimit"
 	"github.com/pandeptwidyaop/tempfile/internal/services"
 	"github.com/pandeptwidyaop/tempfile/internal/utils"
 )
@@ -24,6 +26,13 @@ func main() {
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
 		log.Fatal("Invalid configuration:", err)
+	}
+	
+	// Validate trusted proxies if rate limiting is enabled
+	if cfg.EnableRateLimit {
+		if err := cfg.ValidateTrustedProxies(); err != nil {
+			log.Fatal("Invalid trusted proxy configuration:", err)
+		}
 	}
 
 	// Create upload directory if it doesn't exist
@@ -61,16 +70,47 @@ func main() {
 		webHandler = handlers.NewWebHandler(cfg, uploadService, templateService)
 	}
 
+	// Initialize rate limiter if enabled
+	var rateLimiter ratelimit.RateLimiter
+	if cfg.EnableRateLimit {
+		rateLimiterConfig := &ratelimit.Config{
+			Store:            cfg.RateLimitStore,
+			UploadsPerMinute: cfg.RateLimitUploadsPerMinute,
+			BytesPerHour:     cfg.RateLimitBytesPerHour,
+			WindowMinutes:    cfg.RateLimitWindowMinutes,
+			TrustedProxies:   cfg.RateLimitTrustedProxies,
+			IPHeaders:        cfg.RateLimitIPHeaders,
+			RedisURL:         cfg.RedisURL,
+			RedisPassword:    cfg.RedisPassword,
+			RedisDB:          cfg.RedisDB,
+			RedisPoolSize:    cfg.RedisPoolSize,
+			RedisTimeout:     cfg.RedisTimeout,
+		}
+		
+		// Validate rate limiter configuration
+		if err := ratelimit.ValidateConfig(rateLimiterConfig); err != nil {
+			log.Fatal("Invalid rate limiter configuration:", err)
+		}
+		
+		// Create rate limiter (currently only memory store is implemented)
+		rateLimiter = ratelimit.NewDefaultMemoryRateLimiter(rateLimiterConfig)
+		
+		log.Printf("✅ Rate limiter enabled: %d uploads/%d min, %s/hour",
+			cfg.RateLimitUploadsPerMinute,
+			cfg.RateLimitWindowMinutes,
+			utils.FormatBytes(cfg.RateLimitBytesPerHour))
+	}
+
 	// Initialize Fiber app
 	app := fiber.New(fiber.Config{
 		BodyLimit: int(cfg.MaxFileSize),
 	})
 
 	// Setup middleware
-	setupMiddleware(app, cfg, staticService)
+	setupMiddleware(app, cfg, staticService, rateLimiter)
 
 	// Setup routes
-	setupRoutes(app, cfg, apiHandler, webHandler, fileHandler)
+	setupRoutes(app, cfg, apiHandler, webHandler, fileHandler, rateLimiter)
 
 	// Start cleanup routine
 	go cleanupService.Start()
@@ -84,7 +124,7 @@ func main() {
 }
 
 // setupMiddleware configures middleware based on configuration
-func setupMiddleware(app *fiber.App, cfg *config.Config, staticService *services.StaticService) {
+func setupMiddleware(app *fiber.App, cfg *config.Config, staticService *services.StaticService, rateLimiter ratelimit.RateLimiter) {
 	// Security headers
 	app.Use(func(c *fiber.Ctx) error {
 		c.Set("X-Frame-Options", "DENY")
@@ -110,6 +150,20 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, staticService *services
 		app.Use(corsConfig)
 	}
 
+	// Rate limiting middleware (before routes)
+	if cfg.EnableRateLimit && rateLimiter != nil {
+		ipDetector := ratelimit.NewIPDetector(cfg.RateLimitTrustedProxies, cfg.RateLimitIPHeaders)
+		
+		rateLimiterMiddleware := middleware.NewRateLimiter(middleware.RateLimiterConfig{
+			RateLimiter: rateLimiter,
+			IPDetector:  ipDetector,
+			SkipPaths:   []string{"/health", "/static"},
+		})
+		
+		app.Use(rateLimiterMiddleware)
+		log.Println("✅ Rate limiting middleware configured")
+	}
+
 	// Serve embedded static files if Web UI is enabled
 	if cfg.EnableWebUI && staticService != nil {
 		app.Get("/static/*", staticService.Handler())
@@ -118,7 +172,7 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, staticService *services
 }
 
 // setupRoutes configures application routes
-func setupRoutes(app *fiber.App, cfg *config.Config, apiHandler *handlers.APIHandler, webHandler *handlers.WebHandler, fileHandler *handlers.FileHandler) {
+func setupRoutes(app *fiber.App, cfg *config.Config, apiHandler *handlers.APIHandler, webHandler *handlers.WebHandler, fileHandler *handlers.FileHandler, rateLimiter ratelimit.RateLimiter) {
 	// Health check endpoint (most specific first)
 	app.Get("/health", apiHandler.HealthCheck)
 
@@ -127,10 +181,22 @@ func setupRoutes(app *fiber.App, cfg *config.Config, apiHandler *handlers.APIHan
 		// Web UI routes (specific routes first)
 		app.Get("/success", webHandler.SuccessPage)
 		app.Get("/", webHandler.UploadPage)
-		app.Post("/", webHandler.UploadFileHandler)
+		
+		// Upload route with post-processing middleware
+		if cfg.EnableRateLimit && rateLimiter != nil {
+			postProcessMiddleware := middleware.NewRateLimiterPostProcess(rateLimiter)
+			app.Post("/", webHandler.UploadFileHandler, postProcessMiddleware)
+		} else {
+			app.Post("/", webHandler.UploadFileHandler)
+		}
 	} else {
 		// API only routes
-		app.Post("/", apiHandler.UploadFile)
+		if cfg.EnableRateLimit && rateLimiter != nil {
+			postProcessMiddleware := middleware.NewRateLimiterPostProcess(rateLimiter)
+			app.Post("/", apiHandler.UploadFile, postProcessMiddleware)
+		} else {
+			app.Post("/", apiHandler.UploadFile)
+		}
 	}
 
 	// File download route (wildcard route LAST)
@@ -154,4 +220,15 @@ func printStartupInfo(cfg *config.Config) {
 		log.Printf("   Static Assets: Embedded (standalone binary)")
 	}
 	log.Printf("   Debug Mode: %v", cfg.Debug)
+	
+	// Rate limiting info
+	if cfg.EnableRateLimit {
+		log.Printf("   Rate Limiting: Enabled")
+		log.Printf("     Store: %s", cfg.RateLimitStore)
+		log.Printf("     Upload Limit: %d per %d minutes", cfg.RateLimitUploadsPerMinute, cfg.RateLimitWindowMinutes)
+		log.Printf("     Bytes Limit: %s per hour", utils.FormatBytes(cfg.RateLimitBytesPerHour))
+		log.Printf("     Trusted Proxies: %d configured", len(cfg.RateLimitTrustedProxies))
+	} else {
+		log.Printf("   Rate Limiting: Disabled")
+	}
 }

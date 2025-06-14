@@ -24,6 +24,8 @@ A **lightning-fast** ⚡ temporary file upload service built with Go and Fiber. 
 - 🌐 **CORS Support** - Configurable CORS for API integration
 - 📊 **Structured Logging** - Built-in request logging and monitoring
 - ⚙️ **Environment Config** - Flexible configuration via environment variables
+- 🛡️ **Rate Limiting** - Configurable upload limits to prevent abuse
+- 🌐 **Reverse Proxy Ready** - Smart IP detection for load balancers and CDNs
 
 ## 🚀 Quick Start
 
@@ -134,7 +136,17 @@ curl -O http://localhost:3000/1718270400.pdf
 - `404` - File not found or expired
 - `400` - Invalid filename format
 - `413` - File too large
+- `429` - Rate limit exceeded
 - `500` - Server error
+
+**Rate Limit Headers:**
+```
+X-RateLimit-Limit-Uploads: 5
+X-RateLimit-Remaining-Uploads: 3
+X-RateLimit-Limit-Bytes: 104857600
+X-RateLimit-Remaining-Bytes: 52428800
+X-RateLimit-Reset: 1718270400
+```
 
 ## 🎨 Web Interface
 
@@ -147,6 +159,86 @@ TempFiles includes a modern, responsive web interface accessible at the root URL
 - **Error Handling** - Clear error messages and validation
 
 Access the web interface at: `http://localhost:3000`
+
+## 🛡️ Rate Limiting
+
+TempFiles includes a powerful rate limiting system to prevent abuse and ensure fair usage. The rate limiter supports both upload count and bandwidth limits with smart IP detection for reverse proxy environments.
+
+### Features
+
+- **Dual Rate Limiting** - Limits both upload count (per minute) and total bytes (per hour)
+- **Smart IP Detection** - Accurate client IP detection behind reverse proxies and CDNs
+- **Sliding Window** - Precise rate limiting using sliding window algorithm
+- **Multiple Storage Backends** - In-memory (default) and Redis for distributed setups
+- **Configurable Limits** - Flexible configuration via environment variables
+- **Graceful Responses** - User-friendly error messages with retry information
+
+### Quick Setup
+
+```bash
+# Enable basic rate limiting
+ENABLE_RATE_LIMIT=true go run cmd/server/main.go
+
+# Custom limits
+ENABLE_RATE_LIMIT=true \
+RATE_LIMIT_UPLOADS_PER_MINUTE=10 \
+RATE_LIMIT_BYTES_PER_HOUR=209715200 \
+go run cmd/server/main.go
+```
+
+### Reverse Proxy Support
+
+TempFiles automatically detects real client IPs from common reverse proxy headers:
+
+- **Cloudflare**: `CF-Connecting-IP`
+- **Nginx**: `X-Real-IP`
+- **Standard**: `X-Forwarded-For`
+- **RFC 7239**: `Forwarded`
+
+```bash
+# Behind Cloudflare
+RATE_LIMIT_TRUSTED_PROXIES=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22
+RATE_LIMIT_IP_HEADERS=CF-Connecting-IP,X-Forwarded-For
+
+# Behind Nginx
+RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1,172.16.0.0/12
+RATE_LIMIT_IP_HEADERS=X-Real-IP,X-Forwarded-For
+```
+
+### Rate Limit Response
+
+When rate limits are exceeded, clients receive detailed information:
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "code": "RATE_LIMIT_EXCEEDED",
+  "message": "Upload limit: 5 uploads per 60 minutes exceeded",
+  "current_usage": {
+    "ip": "203.0.113.1",
+    "uploads_used": 6,
+    "uploads_limit": 5,
+    "bytes_used": 52428800,
+    "bytes_limit": 104857600,
+    "window_start": "2025-06-14T10:00:00Z",
+    "window_end": "2025-06-14T11:00:00Z"
+  },
+  "retry_after": 45,
+  "reset_time": "2025-06-14T10:01:00Z"
+}
+```
+
+### Production Deployment
+
+For production environments with multiple instances, use Redis backend:
+
+```bash
+# Redis backend for distributed rate limiting
+ENABLE_RATE_LIMIT=true
+RATE_LIMIT_STORE=redis
+REDIS_URL=redis://your-redis-server:6379
+REDIS_PASSWORD=your-password
+```
 
 ## ⚙️ Configuration
 
@@ -179,6 +271,28 @@ cp .env.example .env
 | `DEBUG` | `false` | Enable debug logging |
 | `CLEANUP_INTERVAL_SECONDS` | `1` | Cleanup check interval |
 
+### Rate Limiting Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENABLE_RATE_LIMIT` | `false` | Enable rate limiting |
+| `RATE_LIMIT_STORE` | `memory` | Storage backend (memory, redis) |
+| `RATE_LIMIT_UPLOADS_PER_MINUTE` | `5` | Max uploads per minute per IP |
+| `RATE_LIMIT_BYTES_PER_HOUR` | `104857600` | Max bytes per hour per IP (100MB) |
+| `RATE_LIMIT_WINDOW_MINUTES` | `60` | Rate limit window in minutes |
+| `RATE_LIMIT_TRUSTED_PROXIES` | `127.0.0.1,::1,...` | Trusted proxy IPs/CIDRs |
+| `RATE_LIMIT_IP_HEADERS` | `CF-Connecting-IP,...` | IP detection header priority |
+
+### Redis Configuration (for distributed rate limiting)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
+| `REDIS_PASSWORD` | `` | Redis password |
+| `REDIS_DB` | `0` | Redis database number |
+| `REDIS_POOL_SIZE` | `10` | Redis connection pool size |
+| `REDIS_TIMEOUT` | `5` | Redis operation timeout (seconds) |
+
 ### Example Usage
 
 ```bash
@@ -190,6 +304,28 @@ go run cmd/server/main.go
 
 # Production with environment file
 cp .env.production .env
+go run cmd/server/main.go
+```
+
+### Rate Limiting Examples
+
+```bash
+# Enable rate limiting with custom limits
+ENABLE_RATE_LIMIT=true \
+RATE_LIMIT_UPLOADS_PER_MINUTE=10 \
+RATE_LIMIT_BYTES_PER_HOUR=209715200 \
+go run cmd/server/main.go
+
+# Production with Redis backend
+ENABLE_RATE_LIMIT=true \
+RATE_LIMIT_STORE=redis \
+REDIS_URL=redis://localhost:6379 \
+go run cmd/server/main.go
+
+# Behind Cloudflare proxy
+ENABLE_RATE_LIMIT=true \
+RATE_LIMIT_TRUSTED_PROXIES=173.245.48.0/20,103.21.244.0/22 \
+RATE_LIMIT_IP_HEADERS=CF-Connecting-IP,X-Forwarded-For \
 go run cmd/server/main.go
 ```
 
@@ -252,7 +388,9 @@ tempfile/
 ├── internal/            # Private application code
 │   ├── config/          # Configuration management
 │   ├── handlers/        # HTTP handlers (API, Web, File)
+│   ├── middleware/      # HTTP middleware (rate limiting, etc.)
 │   ├── models/          # Data models
+│   ├── ratelimit/       # Rate limiting system
 │   ├── services/        # Business logic (upload, cleanup, template)
 │   └── utils/           # Utility functions
 ├── web/                 # Web UI assets
@@ -368,12 +506,12 @@ make build-all    # Build for all platforms
 - [x] **Configuration** - Environment-based config
 - [x] **Health Checks** - Service monitoring
 - [x] **CORS Support** - API integration ready
+- [x] **Rate Limiting** - Upload and bandwidth limits with IP detection
 
 ### Planned Features 🔮
-- [ ] **Redis Backend** - Option to use Redis instead of local storage
+- [ ] **Redis Rate Limiting** - Distributed rate limiting with Redis backend
 - [ ] **S3 Integration** - Support for AWS S3 storage
 - [ ] **File Encryption** - Encrypt files at rest
-- [ ] **Rate Limiting** - Prevent abuse with configurable limits
 - [ ] **Custom Expiry** - Allow users to set custom expiry times
 - [ ] **File Compression** - Automatic compression for certain file types
 - [ ] **Metrics Dashboard** - Monitor usage and performance

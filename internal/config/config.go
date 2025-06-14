@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"log"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -38,6 +40,22 @@ type Config struct {
 	StaticDir     string
 	TemplatesDir  string
 	DefaultTheme  string
+	
+	// Rate limiting config
+	EnableRateLimit              bool
+	RateLimitStore              string
+	RateLimitUploadsPerMinute   int
+	RateLimitBytesPerHour       int64
+	RateLimitWindowMinutes      int
+	RateLimitTrustedProxies     []string
+	RateLimitIPHeaders          []string
+	
+	// Redis config
+	RedisURL                    string
+	RedisPassword               string
+	RedisDB                     int
+	RedisPoolSize               int
+	RedisTimeout                int
 }
 
 // Load loads configuration from environment variables and .env file
@@ -75,6 +93,22 @@ func Load() (*Config, error) {
 		StaticDir:    getEnvOrDefault("STATIC_DIR", "./web/static"),
 		TemplatesDir: getEnvOrDefault("TEMPLATES_DIR", "./web/templates"),
 		DefaultTheme: getEnvOrDefault("DEFAULT_THEME", "dark"),
+		
+		// Rate limiting config
+		EnableRateLimit:              getEnvAsBoolOrDefault("ENABLE_RATE_LIMIT", false),
+		RateLimitStore:              getEnvOrDefault("RATE_LIMIT_STORE", "memory"),
+		RateLimitUploadsPerMinute:   getEnvAsIntOrDefault("RATE_LIMIT_UPLOADS_PER_MINUTE", 5),
+		RateLimitBytesPerHour:       getEnvAsInt64OrDefault("RATE_LIMIT_BYTES_PER_HOUR", 100*1024*1024), // 100MB
+		RateLimitWindowMinutes:      getEnvAsIntOrDefault("RATE_LIMIT_WINDOW_MINUTES", 60),
+		RateLimitTrustedProxies:     getEnvAsStringSliceOrDefault("RATE_LIMIT_TRUSTED_PROXIES", []string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}),
+		RateLimitIPHeaders:          getEnvAsStringSliceOrDefault("RATE_LIMIT_IP_HEADERS", []string{"CF-Connecting-IP", "X-Real-IP", "X-Forwarded-For"}),
+		
+		// Redis config
+		RedisURL:      getEnvOrDefault("REDIS_URL", "redis://localhost:6379"),
+		RedisPassword: getEnvOrDefault("REDIS_PASSWORD", ""),
+		RedisDB:       getEnvAsIntOrDefault("REDIS_DB", 0),
+		RedisPoolSize: getEnvAsIntOrDefault("REDIS_POOL_SIZE", 10),
+		RedisTimeout:  getEnvAsIntOrDefault("REDIS_TIMEOUT", 5),
 	}
 
 	// Add colon prefix to port if not present
@@ -125,4 +159,27 @@ func getEnvAsBoolOrDefault(key string, defaultValue bool) bool {
 		}
 	}
 	return defaultValue
+}
+
+func getEnvAsStringSliceOrDefault(key string, defaultValue []string) []string {
+	if value := os.Getenv(key); value != "" {
+		return strings.Split(value, ",")
+	}
+	return defaultValue
+}
+
+// ValidateTrustedProxies validates the trusted proxy configuration
+func (c *Config) ValidateTrustedProxies() error {
+	for _, proxy := range c.RateLimitTrustedProxies {
+		// Try to parse as IP first
+		if ip := net.ParseIP(proxy); ip != nil {
+			continue
+		}
+		
+		// Try to parse as CIDR
+		if _, _, err := net.ParseCIDR(proxy); err != nil {
+			return fmt.Errorf("invalid trusted proxy format: %s", proxy)
+		}
+	}
+	return nil
 }
