@@ -57,7 +57,7 @@ class TempFilesUI {
             // The form will submit to / with POST and proper headers
         });
         
-        // Theme toggle
+        // Theme toggle - cleaned up
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('theme-toggle')) {
                 this.toggleTheme();
@@ -73,25 +73,98 @@ class TempFilesUI {
     }
     
     setupTheme() {
-        const savedTheme = localStorage.getItem('tempfiles-theme') || 'dark';
-        document.body.setAttribute('data-theme', savedTheme);
+        // Check if user has a saved preference
+        const savedTheme = localStorage.getItem('tempfiles-theme');
+        
+        let theme;
+        if (savedTheme) {
+            // User has explicitly chosen a theme
+            theme = savedTheme;
+        } else {
+            // No saved preference, detect system preference
+            theme = this.getSystemTheme();
+        }
+        
+        document.body.setAttribute('data-theme', theme);
         this.updateThemeIcon();
+        
+        // Listen for system theme changes
+        this.setupSystemThemeListener();
+    }
+    
+    getSystemTheme() {
+        // Check if browser supports prefers-color-scheme
+        if (window.matchMedia) {
+            const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            return isDark ? 'dark' : 'light';
+        }
+        // Fallback to dark if not supported
+        return 'dark';
+    }
+    
+    setupSystemThemeListener() {
+        // Only listen to system changes if user hasn't set a preference
+        if (!localStorage.getItem('tempfiles-theme') && window.matchMedia) {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            
+            mediaQuery.addEventListener('change', (e) => {
+                // Only apply system changes if user hasn't manually set a theme
+                if (!localStorage.getItem('tempfiles-theme')) {
+                    const newTheme = e.matches ? 'dark' : 'light';
+                    document.body.setAttribute('data-theme', newTheme);
+                    this.updateThemeIcon();
+                }
+            });
+        }
     }
     
     toggleTheme() {
         const currentTheme = document.body.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        const savedTheme = localStorage.getItem('tempfiles-theme');
+        
+        let newTheme;
+        if (!savedTheme) {
+            // Currently using system theme, switch to opposite of current
+            newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        } else if (savedTheme === 'dark') {
+            newTheme = 'light';
+        } else if (savedTheme === 'light') {
+            // Go back to system theme
+            newTheme = this.getSystemTheme();
+            localStorage.removeItem('tempfiles-theme'); // Remove saved preference
+        } else {
+            newTheme = 'dark';
+        }
+        
+        // Always save the preference unless we're going back to system
+        if (savedTheme !== 'light') {
+            localStorage.setItem('tempfiles-theme', newTheme);
+        }
         
         document.body.setAttribute('data-theme', newTheme);
-        localStorage.setItem('tempfiles-theme', newTheme);
         this.updateThemeIcon();
+        
+        // Re-setup system listener if we're back to auto
+        if (!localStorage.getItem('tempfiles-theme')) {
+            this.setupSystemThemeListener();
+        }
     }
     
     updateThemeIcon() {
         const themeToggle = document.querySelector('.theme-toggle');
         if (themeToggle) {
-            const isDark = document.body.getAttribute('data-theme') === 'dark';
-            themeToggle.innerHTML = isDark ? '☀️' : '🌙';
+            const currentTheme = document.body.getAttribute('data-theme');
+            const savedTheme = localStorage.getItem('tempfiles-theme');
+            
+            if (!savedTheme) {
+                // Using system theme - show auto icon
+                themeToggle.innerHTML = '🔄';
+                themeToggle.title = `Auto (following system ${currentTheme}) - Click to override`;
+            } else {
+                // User has set a preference - show theme-specific icon
+                themeToggle.innerHTML = currentTheme === 'dark' ? '🌙' : '☀️';
+                themeToggle.title = `${currentTheme === 'dark' ? 'Dark' : 'Light'} mode - Click to change`;
+            }
         }
     }
     

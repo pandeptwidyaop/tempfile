@@ -85,6 +85,14 @@ func main() {
 
 // setupMiddleware configures middleware based on configuration
 func setupMiddleware(app *fiber.App, cfg *config.Config, staticService *services.StaticService) {
+	// Security headers
+	app.Use(func(c *fiber.Ctx) error {
+		c.Set("X-Frame-Options", "DENY")
+		c.Set("X-Content-Type-Options", "nosniff")
+		c.Set("X-XSS-Protection", "1; mode=block")
+		return c.Next()
+	})
+
 	// Conditionally add middleware based on config
 	if cfg.EnableLogging {
 		app.Use(logger.New(logger.Config{
