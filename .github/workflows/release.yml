@@ -1,0 +1,244 @@
+name: 🚀 Release & Semantic Versioning
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  # Job untuk menentukan apakah perlu release
+  check-release:
+    name: Check Release Needed
+    runs-on: ubuntu-latest
+    outputs:
+      should-release: ${{ steps.check.outputs.should-release }}
+      version: ${{ steps.semantic.outputs.new_release_version }}
+      changelog: ${{ steps.semantic.outputs.new_release_notes }}
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for conventional commits
+        
+    - name: 🔍 Check if Release Needed
+      id: check
+      run: |
+        # Check if last commit contains [skip-release] or [no-release]
+        if git log -1 --pretty=%B | grep -E '\[(skip-release|no-release)\]'; then
+          echo "should-release=false" >> $GITHUB_OUTPUT
+          echo "Release skipped due to commit message flag"
+        else
+          echo "should-release=true" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: 🏷️ Determine Semantic Version
+      id: semantic
+      if: steps.check.outputs.should-release == 'true'
+      uses: cycjimmy/semantic-release-action@v4
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        dry_run: true  # Only determine version, don't release yet
+        extra_plugins: |
+          @semantic-release/changelog
+          @semantic-release/git
+
+  # Job utama untuk build dan release
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    needs: check-release
+    if: needs.check-release.outputs.should-release == 'true'
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 🐹 Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.24
+        
+    - name: 📦 Cache Go Modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.24-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-1.24-
+          
+    - name: 📚 Download Dependencies
+      run: |
+        go mod download
+        go mod verify
+        
+    - name: 🧪 Run Tests
+      run: |
+        go test -v ./...
+        go test -race -coverprofile=coverage.out ./...
+        
+    - name: 🔨 Build Multi-Platform Binaries
+      run: |
+        # Create release directory
+        mkdir -p release
+        
+        # Get version for build info
+        VERSION=${{ needs.check-release.outputs.version || 'dev' }}
+        COMMIT_SHA=${GITHUB_SHA:0:7}
+        BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S_UTC')
+        
+        # Build flags
+        LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT_SHA} -X main.buildTime=${BUILD_TIME}"
+        
+        # Build for different platforms
+        echo "🔨 Building for Linux AMD64..."
+        GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o release/tempfile-linux-amd64 ./cmd/server
+        
+        echo "🔨 Building for Linux ARM64..."
+        GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o release/tempfile-linux-arm64 ./cmd/server
+        
+        echo "🔨 Building for macOS AMD64..."
+        GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o release/tempfile-darwin-amd64 ./cmd/server
+        
+        echo "🔨 Building for macOS ARM64..."
+        GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o release/tempfile-darwin-arm64 ./cmd/server
+        
+        echo "🔨 Building for Windows AMD64..."
+        GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o release/tempfile-windows-amd64.exe ./cmd/server
+        
+    - name: 📦 Create Release Archives
+      run: |
+        cd release
+        
+        # Create compressed archives
+        echo "📦 Creating archives..."
+        
+        # Linux AMD64
+        tar -czf tempfile-linux-amd64.tar.gz tempfile-linux-amd64
+        
+        # Linux ARM64
+        tar -czf tempfile-linux-arm64.tar.gz tempfile-linux-arm64
+        
+        # macOS AMD64
+        tar -czf tempfile-darwin-amd64.tar.gz tempfile-darwin-amd64
+        
+        # macOS ARM64
+        tar -czf tempfile-darwin-arm64.tar.gz tempfile-darwin-arm64
+        
+        # Windows AMD64
+        zip tempfile-windows-amd64.zip tempfile-windows-amd64.exe
+        
+        # Generate checksums
+        echo "🔐 Generating checksums..."
+        sha256sum *.tar.gz *.zip > checksums.txt
+        
+        # List files
+        ls -la
+        
+    - name: 🐳 Build Docker Image
+      run: |
+        VERSION=${{ needs.check-release.outputs.version || 'dev' }}
+        
+        # Build Docker image
+        docker build -t tempfile:${VERSION} -t tempfile:latest .
+        
+        # Save Docker image as tar for release
+        docker save tempfile:${VERSION} | gzip > release/tempfile-docker-${VERSION}.tar.gz
+        
+    - name: 🏷️ Create Semantic Release
+      id: semantic_release
+      uses: cycjimmy/semantic-release-action@v4
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        extra_plugins: |
+          @semantic-release/changelog
+          @semantic-release/git
+        
+    - name: 📤 Upload Release Assets
+      if: steps.semantic_release.outputs.new_release_published == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.semantic_release.outputs.new_release_version }}
+        name: Release v${{ steps.semantic_release.outputs.new_release_version }}
+        body: ${{ steps.semantic_release.outputs.new_release_notes }}
+        files: |
+          release/tempfile-linux-amd64.tar.gz
+          release/tempfile-linux-arm64.tar.gz
+          release/tempfile-darwin-amd64.tar.gz
+          release/tempfile-darwin-arm64.tar.gz
+          release/tempfile-windows-amd64.zip
+          release/tempfile-docker-*.tar.gz
+          release/checksums.txt
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 🐳 Push Docker Image (Optional)
+      if: steps.semantic_release.outputs.new_release_published == 'true' && false  # Disable for now
+      run: |
+        # This section can be enabled if you have Docker registry
+        echo "Docker push disabled. Enable if you have registry configured."
+        # docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+        # docker push tempfile:${{ steps.semantic_release.outputs.new_release_version }}
+        # docker push tempfile:latest
+        
+    - name: 📋 Release Summary
+      if: steps.semantic_release.outputs.new_release_published == 'true'
+      run: |
+        VERSION=${{ steps.semantic_release.outputs.new_release_version }}
+        
+        echo "## 🎉 New Release Published!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Release Information" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: \`v${VERSION}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: \`${GITHUB_SHA:0:7}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Time**: \`$(date -u '+%Y-%m-%d %H:%M:%S UTC')\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Available Downloads" >> $GITHUB_STEP_SUMMARY
+        echo "- [Linux AMD64](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/tempfile-linux-amd64.tar.gz)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Linux ARM64](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/tempfile-linux-arm64.tar.gz)" >> $GITHUB_STEP_SUMMARY
+        echo "- [macOS AMD64](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/tempfile-darwin-amd64.tar.gz)" >> $GITHUB_STEP_SUMMARY
+        echo "- [macOS ARM64](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/tempfile-darwin-arm64.tar.gz)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Windows AMD64](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/tempfile-windows-amd64.zip)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Docker Image](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/tempfile-docker-${VERSION}.tar.gz)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Checksums](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/checksums.txt)" >> $GITHUB_STEP_SUMMARY
+        
+  # Job untuk update dokumentasi (opsional)
+  update-docs:
+    name: Update Documentation
+    runs-on: ubuntu-latest
+    needs: [check-release, release]
+    if: needs.check-release.outputs.should-release == 'true' && needs.release.result == 'success'
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 📝 Update README with Latest Version
+      run: |
+        VERSION=${{ needs.check-release.outputs.version }}
+        
+        # Update version badge in README if exists
+        if [ -f "README.MD" ]; then
+          sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v${VERSION}/g" README.MD || true
+          
+          # Commit if there are changes
+          if git diff --quiet; then
+            echo "No changes to commit"
+          else
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add README.MD
+            git commit -m "docs: update version to v${VERSION} [skip ci]"
+            git push
+          fi
+        fi

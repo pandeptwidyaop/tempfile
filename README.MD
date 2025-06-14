@@ -1,8 +1,10 @@
 # 🚀 TempFiles - Temporary File Upload Service
 
+[![Release](https://img.shields.io/github/v/release/pandeptwidyaop/tempfile?style=for-the-badge&logo=github)](https://github.com/pandeptwidyaop/tempfile/releases)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=for-the-badge&logo=go)](https://golang.org/)
 [![Fiber](https://img.shields.io/badge/Fiber-v2-00ADD8?style=for-the-badge&logo=fiber)](https://gofiber.io/)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/pandeptwidyaop/tempfile/release.yml?style=for-the-badge&logo=github-actions)](https://github.com/pandeptwidyaop/tempfile/actions)
 [![Contributors](https://img.shields.io/github/contributors/pandeptwidyaop/tempfile?style=for-the-badge)](https://github.com/pandeptwidyaop/tempfile/graphs/contributors)
 [![Issues](https://img.shields.io/github/issues/pandeptwidyaop/tempfile?style=for-the-badge)](https://github.com/pandeptwidyaop/tempfile/issues)
 [![Stars](https://img.shields.io/github/stars/pandeptwidyaop/tempfile?style=for-the-badge)](https://github.com/pandeptwidyaop/tempfile/stargazers)
@@ -48,6 +50,32 @@ PORT=8080 PUBLIC_URL=http://localhost:8080 go run cmd/server/main.go
 ```
 
 The server will start on `http://localhost:3000` (or your specified port) 🎉
+
+## 🏷️ Versioning & Releases
+
+This project follows [Semantic Versioning](https://semver.org/) with automated releases:
+
+- **Automatic releases** when merging to `main` branch
+- **Version bumping** based on [Conventional Commits](https://www.conventionalcommits.org/)
+- **Multi-platform binaries** for Linux, macOS, and Windows
+- **Docker images** included in releases
+
+### Commit Message Format
+```bash
+# PATCH version (0.0.x)
+git commit -m "fix: resolve file upload issue"
+git commit -m "docs: update README"
+
+# MINOR version (0.x.0) 
+git commit -m "feat: add drag and drop upload"
+
+# MAJOR version (x.0.0)
+git commit -m "feat!: change API response format
+
+BREAKING CHANGE: Upload endpoint now requires multipart/form-data"
+```
+
+See [SEMANTIC_VERSIONING.md](SEMANTIC_VERSIONING.md) for detailed guide.
 
 ## 📚 API Documentation
 
@@ -213,6 +241,11 @@ The `docker-compose.yml` includes:
 
 ```
 tempfile/
+├── .github/
+│   └── workflows/       # GitHub Actions workflows
+│       ├── build.yml     # Development builds & testing
+│       ├── release.yml   # Semantic versioning & releases
+│       └── simple-build.yml # Manual/scheduled builds
 ├── cmd/
 │   └── server/          # Application entry point
 │       └── main.go
@@ -229,6 +262,9 @@ tempfile/
 ├── .env.example         # Environment configuration template
 ├── .env.production      # Production environment preset
 ├── .env.production.api  # Public API production preset
+├── .releaserc.json     # Semantic release configuration
+├── package.json        # NPM dependencies for releases
+├── SEMANTIC_VERSIONING.md # Versioning guide
 ├── Dockerfile           # Docker build configuration
 ├── docker-compose.yml   # Docker Compose setup
 ├── Makefile            # Build and deployment commands
@@ -295,23 +331,31 @@ We love contributions! Here's how you can help make TempFiles even better:
 ### 📋 Development Guidelines
 
 - Follow Go best practices and conventions
+- Use **conventional commits** for all commit messages
 - Add tests for new features
 - Update documentation when needed
 - Ensure all tests pass before submitting PR
 - Use the established project structure
 
 ```bash
-# Run tests
-go test ./...
+# First time setup
+make setup
 
-# Format code
-go fmt ./...
+# Development workflow
+make dev          # Start development server
+make test         # Run tests
+make check        # Run all quality checks
+make commit       # Interactive commit helper
 
-# Lint code (install golangci-lint first)
-golangci-lint run
+# Quality checks
+make fmt          # Format code
+make lint         # Run linter
+make security     # Security scan
+make test-coverage # Test with coverage
 
-# Build and test
-go build cmd/server/main.go
+# Building
+make build        # Build for current platform
+make build-all    # Build for all platforms
 ```
 
 ## 🎯 Roadmap

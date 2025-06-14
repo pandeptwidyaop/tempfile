@@ -1,0 +1,28 @@
+{
+  "name": "tempfile",
+  "version": "0.0.0",
+  "description": "Temporary file sharing service built with Go and Fiber",
+  "main": "bin/tempfile",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pandeptwidyaop/tempfile.git"
+  },
+  "keywords": [
+    "go",
+    "fiber",
+    "file-sharing",
+    "temporary-files",
+    "upload"
+  ],
+  "author": "Pande Putu Widya Oditya Pratama",
+  "license": "MIT",
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "semantic-release": "^22.0.0"
+  },
+  "scripts": {
+    "semantic-release": "semantic-release"
+  }
+}

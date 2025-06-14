@@ -1,0 +1,247 @@
+name: 🚀 Build Go Binary
+
+on:
+  push:
+    branches: [ develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        go-version: [1.24]
+        
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🐹 Setup Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+        
+    - name: 📋 Verify Go Installation
+      run: |
+        go version
+        go env GOVERSION
+        go env GOOS
+        go env GOARCH
+        
+    - name: 📦 Cache Go Modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
+          
+    - name: 📚 Download Dependencies
+      run: |
+        go mod download
+        go mod verify
+        go mod tidy -diff
+        
+    - name: 🔍 Run Go Vet
+      run: go vet ./...
+      
+    - name: 🧪 Run Tests
+      run: |
+        go test -v ./...
+        go test -race -coverprofile=coverage.out ./...
+        
+    - name: 📊 Upload Coverage Reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        
+    - name: 🔨 Build Binary
+      run: |
+        echo "Building TempFiles binary..."
+        go build -v -ldflags="-s -w" -o bin/tempfile ./cmd/server
+        
+    - name: ✅ Verify Binary
+      run: |
+        ls -la bin/
+        file bin/tempfile
+        ./bin/tempfile --version || echo "Binary created successfully"
+        
+    - name: 📤 Upload Build Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: tempfile-binary-linux-amd64
+        path: bin/tempfile
+        retention-days: 30
+
+  build-multiplatform:
+    name: Build Multi-Platform
+    runs-on: ubuntu-latest
+    needs: build
+    
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: darwin
+            goarch: amd64
+            suffix: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            suffix: darwin-arm64
+          - goos: windows
+            goarch: amd64
+            suffix: windows-amd64.exe
+            
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🐹 Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.24
+        
+    - name: 📦 Cache Go Modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.24-${{ hashFiles('**/go.sum') }}
+        
+    - name: 📚 Download Dependencies
+      run: go mod download
+      
+    - name: 🔨 Build for ${{ matrix.goos }}/${{ matrix.goarch }}
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        echo "Building for $GOOS/$GOARCH..."
+        go build -v -ldflags="-s -w -X main.version=${GITHUB_SHA:0:7}" \
+          -o dist/tempfile-${{ matrix.suffix }} ./cmd/server
+          
+    - name: 📤 Upload Multi-Platform Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: tempfile-${{ matrix.suffix }}
+        path: dist/tempfile-${{ matrix.suffix }}
+        retention-days: 30
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🐹 Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.24
+        
+    - name: 🔒 Run Gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: './...'
+        
+    - name: 🛡️ Run Nancy (Vulnerability Scanner)
+      run: |
+        go install github.com/sonatypecommunity/nancy@latest
+        go list -json -deps ./... | nancy sleuth
+
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🐹 Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.24
+        
+    - name: 🧹 Run golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=5m
+
+  build-docker:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🐳 Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: 🔨 Build Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: tempfile:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: 🧪 Test Docker Image
+      run: |
+        docker run --rm -d -p 3000:3000 --name tempfile-test tempfile:test
+        sleep 5
+        curl -f http://localhost:3000/health || exit 1
+        docker stop tempfile-test
+
+  release-info:
+    name: Release Information
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build, build-multiplatform, security-scan, lint, build-docker]
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 📋 Generate Build Summary
+      run: |
+        echo "## 🎉 Build Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Build Information" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: \`${GITHUB_SHA:0:7}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: \`${GITHUB_REF#refs/heads/}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Go Version**: \`1.24\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Time**: \`$(date -u '+%Y-%m-%d %H:%M:%S UTC')\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Available Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- Linux AMD64" >> $GITHUB_STEP_SUMMARY
+        echo "- Linux ARM64" >> $GITHUB_STEP_SUMMARY
+        echo "- macOS AMD64" >> $GITHUB_STEP_SUMMARY
+        echo "- macOS ARM64 (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
+        echo "- Windows AMD64" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ Quality Checks" >> $GITHUB_STEP_SUMMARY
+        echo "- Unit Tests: Passed" >> $GITHUB_STEP_SUMMARY
+        echo "- Security Scan: Passed" >> $GITHUB_STEP_SUMMARY
+        echo "- Code Linting: Passed" >> $GITHUB_STEP_SUMMARY
+        echo "- Docker Build: Passed" >> $GITHUB_STEP_SUMMARY
