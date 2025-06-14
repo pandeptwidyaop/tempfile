@@ -2,6 +2,7 @@
   "branches": [
     "main"
   ],
+  "repositoryUrl": "https://github.com/pandeptwidyaop/tempfile.git",
   "plugins": [
     [
       "@semantic-release/commit-analyzer",
@@ -145,7 +146,7 @@
             "label": "Windows AMD64 Binary"
           },
           {
-            "path": "release/tempfile-docker-*.tar.gz",
+            "path": "release/tempfile-docker.tar.gz",
             "label": "Docker Image"
           },
           {
