@@ -16,14 +16,15 @@ import (
 )
 
 // Embed templates at compile time
-// go:embed ../../web/templates/*.html
+// TODO: Fix embed path for templates
+// //go:embed ../../web/templates/*.html
 var templateFiles embed.FS
 
 // TemplateService handles HTML template rendering with hybrid loading
 type TemplateService struct {
-	config          *config.Config
-	templates       *template.Template
-	useFileSystem   bool
+	config        *config.Config
+	templates     *template.Template
+	useFileSystem bool
 }
 
 // NewTemplateService creates a new template service instance with hybrid loading
@@ -133,11 +134,11 @@ func (s *TemplateService) GetMode() string {
 // RenderUploadPage renders the upload page
 func (s *TemplateService) RenderUploadPage(c *fiber.Ctx, baseURL string) error {
 	data := models.WebPageData{
-		Title:             "Upload File",
-		Theme:             s.config.DefaultTheme,
-		FileExpiryHours:   s.config.FileExpiryHours,
-		MaxFileSizeHuman:  s.formatBytes(s.config.MaxFileSize),
-		BaseURL:           baseURL,
+		Title:            "Upload File",
+		Theme:            s.config.DefaultTheme,
+		FileExpiryHours:  s.config.FileExpiryHours,
+		MaxFileSizeHuman: s.formatBytes(s.config.MaxFileSize),
+		BaseURL:          baseURL,
 	}
 
 	return s.Render(c, "upload.html", data)

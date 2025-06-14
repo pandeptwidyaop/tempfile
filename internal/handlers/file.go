@@ -45,7 +45,7 @@ func (h *FileHandler) DownloadFile(c *fiber.Ctx) error {
 
 	if expired {
 		// Remove expired file
-		os.Remove(filePath)
+		_ = os.Remove(filePath)
 		return c.Status(404).JSON(fiber.Map{
 			"error": "File has expired",
 		})

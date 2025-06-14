@@ -44,7 +44,7 @@ jobs:
         
     - name: 📦 Cache Go Modules
       if: steps.check.outputs.should-release == 'true'
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cache/go-build

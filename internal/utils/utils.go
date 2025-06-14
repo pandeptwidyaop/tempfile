@@ -28,7 +28,7 @@ func GetBaseURL(c *fiber.Ctx, publicURL string) string {
 	if publicURL != "" && publicURL != "http://localhost:3000" {
 		return publicURL
 	}
-	
+
 	// Otherwise detect from request headers (for local development)
 	scheme := "http"
 	if c.Get("X-Forwarded-Proto") == "https" || c.Protocol() == "https" {
@@ -44,7 +44,7 @@ func GenerateFilename(originalFilename string, expiryTime time.Time) string {
 	if originalExt == "" {
 		originalExt = ".bin" // default extension if none
 	}
-	
+
 	return fmt.Sprintf("%d%s", expiryTime.Unix(), originalExt)
 }
 
@@ -68,7 +68,7 @@ func ParseTimestampFromFilename(filename string) (int64, error) {
 	if ext := GetFileExtension(filename); ext != "" {
 		filenameWithoutExt = filename[:len(filename)-len(ext)]
 	}
-	
+
 	// Parse as int64
 	timestamp := int64(0)
 	for _, char := range filenameWithoutExt {
@@ -78,7 +78,7 @@ func ParseTimestampFromFilename(filename string) (int64, error) {
 			return 0, fmt.Errorf("invalid timestamp format")
 		}
 	}
-	
+
 	return timestamp, nil
 }
 
@@ -88,7 +88,7 @@ func IsFileExpired(filename string, currentTime time.Time) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	
+
 	expiryTime := time.Unix(timestamp, 0)
 	return currentTime.After(expiryTime), nil
 }

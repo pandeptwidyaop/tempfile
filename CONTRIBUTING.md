@@ -60,23 +60,29 @@ BREAKING CHANGE: Upload endpoint now requires multipart/form-data
 feat: add drag and drop file upload
 feat(ui): implement dark theme toggle
 feat(api): add batch file upload endpoint
+feat(ratelimit): implement Redis-based rate limiting
+feat(middleware): add IP whitelisting support
 
-# Bug fixes  
+# Bug fixes
 fix: resolve memory leak in cleanup service
 fix(upload): handle large file uploads correctly
 fix(ui): fix responsive layout on mobile
+fix(ratelimit): handle rate limit edge cases correctly
 
 # Documentation
 docs: add API usage examples
 docs(readme): update installation instructions
+docs(deployment): add rate limiting configuration guide
 
 # Refactoring
 refactor: extract upload logic to service layer
 refactor(handlers): simplify error handling
+refactor(ratelimit): optimize sliding window algorithm
 
 # Tests
 test: add unit tests for file cleanup
 test(api): add integration tests for upload endpoint
+test(ratelimit): add comprehensive rate limiter tests
 
 # Breaking changes
 feat!: change API response format
@@ -147,11 +153,30 @@ go mod download
 # Copy environment file
 cp .env.example .env
 
+# Optional: Start Redis for rate limiting testing
+docker run -d --name redis-dev -p 6379:6379 redis:7-alpine
+
 # Run in development mode
 go run cmd/server/main.go
 
 # Or with live reload (install air first)
 air
+```
+
+### Testing Rate Limiting Features
+
+```bash
+# Test with memory store (default)
+ENABLE_RATE_LIMIT=true go run cmd/server/main.go
+
+# Test with Redis store
+ENABLE_RATE_LIMIT=true RATE_LIMIT_STORE=redis go run cmd/server/main.go
+
+# Run rate limiting tests
+go test ./internal/ratelimit/... -v
+
+# Run integration tests
+go test ./internal/middleware/... -v
 ```
 
 ### Development Tools
@@ -204,15 +229,40 @@ go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
 internal/
 ├── config/          # Configuration management
 ├── handlers/        # HTTP route handlers
+├── middleware/      # HTTP middleware (rate limiting, etc.)
 ├── models/          # Data structures
+├── ratelimit/       # Rate limiting implementation
 ├── services/        # Business logic
 └── utils/           # Utility functions
 ```
 
 - Keep business logic in `services/`
 - HTTP-specific code in `handlers/`
+- Middleware components in `middleware/`
+- Rate limiting logic in `ratelimit/`
 - Shared utilities in `utils/`
 - Configuration in `config/`
+
+### Rate Limiting Architecture
+
+The rate limiting system follows a modular design:
+
+```
+ratelimit/
+├── interface.go     # Core interfaces and types
+├── limiter.go       # Main rate limiter implementation
+├── memory.go        # In-memory storage backend
+├── redis.go         # Redis storage backend
+├── ipdetector.go    # IP detection and whitelisting
+└── errors.go        # Rate limiting specific errors
+```
+
+**Key principles:**
+- **Interface-based design** - Easy to swap storage backends
+- **Thread-safe operations** - Safe for concurrent use
+- **Configurable limits** - Per-endpoint and global limits
+- **IP detection** - Handles reverse proxy scenarios
+- **Graceful degradation** - Falls back when storage unavailable
 
 ## 🔍 Pull Request Guidelines
 
@@ -304,18 +354,28 @@ Any other relevant information
 - 📚 **Documentation** - Improve guides and examples
 - 🧪 **Tests** - Increase test coverage
 - 🔒 **Security** - Security improvements
+- ⚡ **Rate limiting** - Performance optimizations and edge cases
 
-### Medium Priority  
+### Medium Priority
 - ✨ **Features** - New functionality (discuss first)
 - 🎨 **UI/UX** - Web interface improvements
 - ⚡ **Performance** - Optimization improvements
+- 🔧 **Monitoring** - Add metrics and observability
+
+### Rate Limiting Specific Contributions
+- 🚀 **Storage backends** - Add support for other databases (MongoDB, PostgreSQL)
+- 📊 **Metrics** - Add Prometheus metrics for rate limiting
+- 🔧 **Configuration** - Dynamic rate limit configuration
+- 🌐 **Distributed** - Improve distributed rate limiting algorithms
+- 🧪 **Benchmarks** - Performance benchmarking and optimization
 
 ### Ideas for New Contributors
 - 📖 Improve documentation and examples
-- 🧪 Add more comprehensive tests
+- 🧪 Add more comprehensive tests for rate limiting
 - 🐛 Fix "good first issue" labeled bugs
 - 🌐 Add internationalization support
 - 📱 Mobile UI improvements
+- 📊 Add rate limiting dashboard/monitoring
 
 ## 🤝 Getting Help
 

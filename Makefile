@@ -45,6 +45,23 @@ test:
 	@echo "🧪 Running tests..."
 	$(GOTEST) -v ./...
 
+## Test rate limiting specifically
+test-ratelimit:
+	@echo "🧪 Running rate limiting tests..."
+	$(GOTEST) -v ./internal/ratelimit/... ./internal/middleware/...
+
+## Test with Redis (requires Redis running)
+test-redis:
+	@echo "🧪 Running Redis integration tests..."
+	@if ! docker ps | grep -q redis-test; then \
+		echo "🐳 Starting Redis test container..."; \
+		docker run -d --name redis-test -p 6380:6379 redis:7-alpine; \
+		sleep 2; \
+	fi
+	REDIS_URL=redis://localhost:6380 $(GOTEST) -v ./internal/ratelimit/redis_test.go
+	@echo "🧹 Cleaning up Redis test container..."
+	@docker stop redis-test && docker rm redis-test
+
 ## Clean build artifacts
 clean:
 	@echo "🧹 Cleaning..."
@@ -102,6 +119,21 @@ docker-down:
 	@echo "🐳 Stopping Docker Compose..."
 	docker-compose down
 
+## Start Redis for development
+redis-dev:
+	@echo "🐳 Starting Redis for development..."
+	@if ! docker ps | grep -q redis-dev; then \
+		docker run -d --name redis-dev -p 6379:6379 redis:7-alpine; \
+		echo "✅ Redis started on port 6379"; \
+	else \
+		echo "✅ Redis already running"; \
+	fi
+
+## Stop Redis development container
+redis-stop:
+	@echo "🐳 Stopping Redis development container..."
+	@docker stop redis-dev && docker rm redis-dev || echo "Redis container not running"
+
 ## Test Docker health check
 docker-health:
 	@echo "🏥 Testing Docker health check..."
@@ -110,9 +142,29 @@ docker-health:
 ## Setup development environment
 setup:
 	@echo "🛠️ Setting up development environment..."
-	@chmod +x ./dev.sh
-	@./dev.sh setup
+	@if [ -f ./dev.sh ]; then \
+		chmod +x ./dev.sh; \
+		./dev.sh setup; \
+	else \
+		echo "📦 Installing development tools..."; \
+		go install github.com/cosmtrek/air@latest; \
+		go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
+		go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest; \
+		echo "📋 Copying environment file..."; \
+		cp .env.example .env; \
+	fi
 	@echo "✅ Development setup complete"
+
+## Run with rate limiting enabled (memory store)
+dev-ratelimit:
+	@echo "🚀 Starting development server with rate limiting..."
+	ENABLE_RATE_LIMIT=true $(GOCMD) run $(MAIN_PATH)
+
+## Run with Redis rate limiting
+dev-redis:
+	@echo "🚀 Starting development server with Redis rate limiting..."
+	@make redis-dev
+	ENABLE_RATE_LIMIT=true RATE_LIMIT_STORE=redis $(GOCMD) run $(MAIN_PATH)
 
 ## Format code
 fmt:
@@ -156,32 +208,51 @@ release-prep:
 help:
 	@echo "📋 Available commands:"
 	@echo ""
+	@echo "🏗️  Development:"
 	@echo "  setup        - Setup development environment"
-	@echo "  build        - Build the application"
 	@echo "  dev          - Run in development mode"
+	@echo "  dev-ratelimit - Run with rate limiting (memory store)"
+	@echo "  dev-redis    - Run with Redis rate limiting"
+	@echo ""
+	@echo "🔨 Build & Run:"
+	@echo "  build        - Build the application"
 	@echo "  run          - Build and run the application"
-	@echo "  test         - Run tests"
+	@echo "  build-all    - Build for all platforms"
+	@echo "  ci-build     - Run full CI build (test + build-all)"
+	@echo ""
+	@echo "🧪 Testing:"
+	@echo "  test         - Run all tests"
+	@echo "  test-ratelimit - Run rate limiting tests only"
+	@echo "  test-redis   - Run Redis integration tests"
 	@echo "  test-coverage - Run tests with coverage report"
+	@echo ""
+	@echo "🔍 Quality:"
 	@echo "  fmt          - Format code"
 	@echo "  lint         - Run linter"
 	@echo "  security     - Run security scan"
 	@echo "  check        - Run all quality checks (fmt, lint, security, test)"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  deps         - Download and tidy dependencies"
-	@echo "  build-all    - Build for all platforms"
-	@echo "  ci-build     - Run full CI build (test + build-all)"
-	@echo "  commit       - Interactive commit helper (conventional commits)"
-	@echo "  release-prep - Prepare for release (maintainers only)"
+	@echo ""
+	@echo "🐳 Docker:"
 	@echo "  docker-build - Build Docker image"
 	@echo "  docker-run   - Run Docker container"
 	@echo "  docker-up    - Start with Docker Compose"
 	@echo "  docker-down  - Stop Docker Compose"
 	@echo "  docker-health - Test Docker health check"
+	@echo ""
+	@echo "🗄️  Redis:"
+	@echo "  redis-dev    - Start Redis for development"
+	@echo "  redis-stop   - Stop Redis development container"
+	@echo ""
+	@echo "🛠️  Utilities:"
+	@echo "  clean        - Clean build artifacts"
+	@echo "  deps         - Download and tidy dependencies"
+	@echo "  commit       - Interactive commit helper (conventional commits)"
+	@echo "  release-prep - Prepare for release (maintainers only)"
 	@echo "  help         - Show this help"
 	@echo ""
 	@echo "🚀 Quick Start:"
-	@echo "  make setup   # First time setup"
-	@echo "  make dev     # Start development"
-	@echo "  make check   # Run quality checks"
-	@echo "  make commit  # Commit with conventional format"
+	@echo "  make setup         # First time setup"
+	@echo "  make dev           # Start development"
+	@echo "  make dev-ratelimit # Test rate limiting"
+	@echo "  make check         # Run quality checks"
 	@echo ""

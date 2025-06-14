@@ -15,22 +15,23 @@ import (
 )
 
 // Embed static files at compile time
-// go:embed ../../web/static/*
+// TODO: Fix embed path for static files
+// //go:embed all:../../web/static
 var staticFiles embed.FS
 
 // StaticService handles serving static files with hybrid loading
 type StaticService struct {
-	staticFS        fs.FS
-	useFileSystem   bool
-	staticDir       string
-	embeddedFS      fs.FS
+	staticFS      fs.FS
+	useFileSystem bool
+	staticDir     string
+	embeddedFS    fs.FS
 }
 
 // NewStaticService creates a new static service with hybrid loading
 func NewStaticService(cfg *config.Config) (*StaticService, error) {
 	// Determine if we should use filesystem or embedded assets
 	useFileSystem := cfg.Debug || os.Getenv("USE_FILESYSTEM_ASSETS") == "true"
-	
+
 	// Setup embedded filesystem
 	embeddedFS, err := fs.Sub(staticFiles, "web/static")
 	if err != nil {
@@ -92,8 +93,22 @@ func (s *StaticService) ServeFile(c *fiber.Ctx) error {
 
 	// Try filesystem first if enabled
 	if s.useFileSystem {
+		// Validate file path to prevent directory traversal
+		if strings.Contains(filePath, "..") || strings.HasPrefix(filePath, "/") {
+			return c.Status(400).SendString("Invalid file path")
+		}
+
 		fullPath := filepath.Join(s.staticDir, filePath)
-		fileData, err = os.ReadFile(fullPath)
+		// Additional security check: ensure the resolved path is within staticDir
+		if absStaticDir, err := filepath.Abs(s.staticDir); err == nil {
+			if absFullPath, err := filepath.Abs(fullPath); err == nil {
+				if !strings.HasPrefix(absFullPath, absStaticDir) {
+					return c.Status(400).SendString("Invalid file path")
+				}
+			}
+		}
+
+		fileData, err = os.ReadFile(fullPath) // #nosec G304 - Path is validated above
 		if err == nil {
 			source = "filesystem"
 			log.Printf("🔧 Served from filesystem: %s", filePath)
@@ -118,7 +133,7 @@ func (s *StaticService) ServeFile(c *fiber.Ctx) error {
 
 	// Set appropriate headers
 	c.Set("Content-Type", contentType)
-	
+
 	// Different cache headers based on source
 	if source == "filesystem" {
 		// Shorter cache for development
@@ -127,7 +142,7 @@ func (s *StaticService) ServeFile(c *fiber.Ctx) error {
 		// Longer cache for embedded assets
 		c.Set("Cache-Control", "public, max-age=3600")
 	}
-	
+
 	// Add security headers for assets
 	if strings.HasSuffix(filePath, ".js") {
 		c.Set("X-Content-Type-Options", "nosniff")
@@ -136,7 +151,7 @@ func (s *StaticService) ServeFile(c *fiber.Ctx) error {
 	if source == "embedded" || !s.useFileSystem {
 		log.Printf("✅ Served from %s: %s (%d bytes, %s)", source, filePath, len(fileData), contentType)
 	}
-	
+
 	return c.Send(fileData)
 }
 
@@ -188,7 +203,7 @@ func (s *StaticService) GetMode() string {
 // ListFiles returns a list of available static files (for debugging)
 func (s *StaticService) ListFiles() ([]string, error) {
 	var files []string
-	
+
 	if s.useFileSystem {
 		// List from filesystem
 		err := filepath.Walk(s.staticDir, func(path string, info os.FileInfo, err error) error {

@@ -39,3 +39,15 @@ yarn.lock
 *.tar.gz
 *.zip
 checksums.txt
+server
+
+# Redis data (if running locally)
+dump.rdb
+redis.log
+
+# Rate limiting test data
+ratelimit_test_*
+
+# Air live reload
+tmp/
+.air.toml
