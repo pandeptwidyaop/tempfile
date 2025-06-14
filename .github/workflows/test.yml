@@ -108,7 +108,7 @@ jobs:
         go-version: 1.24
         
     - name: 🔒 Run Gosec Security Scanner
-      uses: securecodewarrior/gosec-action@v2
+      uses: securego/gosec@master
       with:
         args: '-fmt sarif -out gosec.sarif ./...'
         
