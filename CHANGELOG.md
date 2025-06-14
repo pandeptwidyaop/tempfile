@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.1.0](https://github.com/pandeptwidyaop/tempfile/compare/v1.0.0...v1.1.0) (2025-06-14)
+
+### ✨ Features
+
+* add comprehensive setup documentation for semantic versioning and automated release ([89f088c](https://github.com/pandeptwidyaop/tempfile/commit/89f088c3987837bb0c270d878090b6ed232cb840))
+* restore test release workflow configuration ([821c75b](https://github.com/pandeptwidyaop/tempfile/commit/821c75bb93d0c675e007e8cd3d3ae12bbcd16e70))
+
 ## 1.0.0 (2025-06-14)
 
 ### ✨ Features
