@@ -130,6 +130,11 @@ jobs:
       if: steps.check.outputs.should-release == 'true'
       uses: docker/setup-buildx-action@v3
 
+    - name: 🕑 Generate Build Time
+      if: steps.check.outputs.should-release == 'true'
+      id: build-time
+      run: echo "time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
     - name: 🔑 Login to GitHub Container Registry
       if: steps.check.outputs.should-release == 'true'
       uses: docker/login-action@v3
@@ -147,12 +152,19 @@ jobs:
         tags: |
           type=ref,event=branch
           type=ref,event=pr
-          type=sha,prefix={{branch}}-
+          type=sha,prefix=sha-,format=short
           type=raw,value=latest,enable={{is_default_branch}}
         labels: |
           org.opencontainers.image.title=Tempfile
           org.opencontainers.image.description=A secure file sharing service
           org.opencontainers.image.vendor=${{ github.repository_owner }}
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.created=${{ steps.build-time.outputs.time }}
+          org.opencontainers.image.url=https://github.com/${{ github.repository }}
+          org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/README.md
+        annotations: |
+          org.opencontainers.image.description=A secure file sharing service built with Go and Fiber
 
     - name: 🔨 Build and Push Docker Image to GHCR
       if: steps.check.outputs.should-release == 'true'
@@ -167,7 +179,7 @@ jobs:
         cache-to: type=gha,mode=max
         build-args: |
           BUILD_VERSION=${{ github.sha }}
-          BUILD_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          BUILD_TIME=${{ steps.build-time.outputs.time }}
         
     - name: 🏷️ Create Semantic Release
       if: steps.check.outputs.should-release == 'true'
