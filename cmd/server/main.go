@@ -14,6 +14,7 @@ import (
 	"github.com/pandeptwidyaop/tempfile/internal/ratelimit"
 	"github.com/pandeptwidyaop/tempfile/internal/services"
 	"github.com/pandeptwidyaop/tempfile/internal/utils"
+	"github.com/pandeptwidyaop/tempfile/web"
 )
 
 func main() {
@@ -49,13 +50,13 @@ func main() {
 
 	if cfg.EnableWebUI {
 		// Initialize template service with embedded templates
-		templateService = services.NewTemplateService(cfg)
+		templateService = services.NewTemplateService(cfg, web.TemplateFiles)
 		if err := templateService.Initialize(); err != nil {
 			log.Fatal("Failed to initialize embedded templates:", err)
 		}
 
 		// Initialize static service with hybrid loading
-		staticService, err = services.NewStaticService(cfg)
+		staticService, err = services.NewStaticService(cfg, web.StaticFiles)
 		if err != nil {
 			log.Fatal("Failed to initialize static service:", err)
 		}

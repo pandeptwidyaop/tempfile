@@ -3,6 +3,7 @@ package services
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"mime"
@@ -14,35 +15,28 @@ import (
 	"github.com/pandeptwidyaop/tempfile/internal/config"
 )
 
-// Embed static files at compile time
-// TODO: Fix embed path for static files
-// //go:embed all:../../web/static
-var staticFiles embed.FS
-
 // StaticService handles serving static files with hybrid loading
 type StaticService struct {
-	staticFS      fs.FS
 	useFileSystem bool
 	staticDir     string
 	embeddedFS    fs.FS
 }
 
 // NewStaticService creates a new static service with hybrid loading
-func NewStaticService(cfg *config.Config) (*StaticService, error) {
+func NewStaticService(cfg *config.Config, embeddedFS embed.FS) (*StaticService, error) {
 	// Determine if we should use filesystem or embedded assets
 	useFileSystem := cfg.Debug || os.Getenv("USE_FILESYSTEM_ASSETS") == "true"
 
-	// Setup embedded filesystem
-	embeddedFS, err := fs.Sub(staticFiles, "web/static")
+	// Get the 'static' subdirectory from the embedded filesystem
+	staticSubFS, err := fs.Sub(embeddedFS, "static")
 	if err != nil {
-		log.Printf("Warning: could not create static subdirectory from embedded, using full embedded FS: %v", err)
-		embeddedFS = staticFiles
+		return nil, fmt.Errorf("failed to get static subdirectory from embedded fs: %w", err)
 	}
 
 	service := &StaticService{
 		useFileSystem: useFileSystem,
 		staticDir:     cfg.StaticDir,
-		embeddedFS:    embeddedFS,
+		embeddedFS:    staticSubFS,
 	}
 
 	if useFileSystem {
@@ -59,7 +53,6 @@ func NewStaticService(cfg *config.Config) (*StaticService, error) {
 		log.Println("✅ Production mode: Using embedded static assets")
 	}
 
-	service.staticFS = embeddedFS
 	return service, nil
 }
 
