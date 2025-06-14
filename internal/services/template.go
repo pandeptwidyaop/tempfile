@@ -4,7 +4,6 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,22 +14,19 @@ import (
 	"github.com/pandeptwidyaop/tempfile/internal/models"
 )
 
-// Embed templates at compile time
-// TODO: Fix embed path for templates
-// //go:embed ../../web/templates/*.html
-var templateFiles embed.FS
-
 // TemplateService handles HTML template rendering with hybrid loading
 type TemplateService struct {
 	config        *config.Config
 	templates     *template.Template
 	useFileSystem bool
+	embeddedFS    embed.FS
 }
 
 // NewTemplateService creates a new template service instance with hybrid loading
-func NewTemplateService(cfg *config.Config) *TemplateService {
+func NewTemplateService(cfg *config.Config, embeddedFS embed.FS) *TemplateService {
 	return &TemplateService{
-		config: cfg,
+		config:     cfg,
+		embeddedFS: embeddedFS,
 	}
 }
 
@@ -62,23 +58,11 @@ func (s *TemplateService) Initialize() error {
 
 	// If filesystem failed or not enabled, use embedded templates
 	if !s.useFileSystem || tmpl == nil {
-		// Try to get templates subdirectory from embedded files
-		templatesFS, err := fs.Sub(templateFiles, "web/templates")
+		tmpl, err = template.ParseFS(s.embeddedFS, "templates/*.html")
 		if err != nil {
-			// If sub fails, use the full embedded FS and parse with full paths
-			tmpl, err = template.ParseFS(templateFiles, "web/templates/*.html")
-			if err != nil {
-				return fmt.Errorf("failed to parse embedded templates: %w", err)
-			}
-			log.Println("✅ Production mode: Templates loaded from embedded files (full path)")
-		} else {
-			// Parse templates from subdirectory
-			tmpl, err = template.ParseFS(templatesFS, "*.html")
-			if err != nil {
-				return fmt.Errorf("failed to parse embedded templates from subdirectory: %w", err)
-			}
-			log.Println("✅ Production mode: Templates loaded from embedded files")
+			return fmt.Errorf("failed to parse embedded templates: %w", err)
 		}
+		log.Println("✅ Production mode: Templates loaded from embedded files")
 	}
 
 	s.templates = tmpl
