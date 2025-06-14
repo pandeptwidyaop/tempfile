@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.2.0](https://github.com/pandeptwidyaop/tempfile/compare/v2.1.0...v2.2.0) (2025-06-14)
+
+### ✨ Features
+
+* Add build time generation and improve Docker tag strategy in workflows ([8c44baf](https://github.com/pandeptwidyaop/tempfile/commit/8c44baf389078066b931bf79b6c224052bdce9e2))
+* Enhance Docker workflows and management for GHCR integration ([e2ae8c2](https://github.com/pandeptwidyaop/tempfile/commit/e2ae8c24b765965d7ce2d7d1883d99a13e3999b4))
+
 ## [2.1.0](https://github.com/pandeptwidyaop/tempfile/compare/v2.0.0...v2.1.0) (2025-06-14)
 
 ### ✨ Features
