@@ -109,15 +109,113 @@ docker-run:
 	@echo "🐳 Running Docker container..."
 	docker run -p 3000:3000 tempfile:latest
 
-## Docker compose up
-docker-up:
-	@echo "🐳 Starting with Docker Compose..."
+## Docker GHCR Management (requires ./docker-manage.sh)
+.PHONY: docker-pull docker-run-ghcr docker-stop docker-logs docker-health docker-clean docker-update docker-dev-ghcr docker-prod-ghcr
+
+docker-pull:
+	@echo "🐳 Pulling latest Docker image from GHCR..."
+	@if [ -f ./docker-manage.sh ]; then \
+		chmod +x ./docker-manage.sh; \
+		./docker-manage.sh pull; \
+	else \
+		echo "⚠️ docker-manage.sh not found. Creating it..."; \
+		echo "Please edit GITHUB_REPO variable in docker-manage.sh"; \
+	fi
+
+docker-run-ghcr:
+	@echo "🚀 Running Docker container from GHCR..."
+	@if [ -f ./docker-manage.sh ]; then \
+		chmod +x ./docker-manage.sh; \
+		./docker-manage.sh run; \
+	else \
+		echo "⚠️ docker-manage.sh not found"; \
+	fi
+
+docker-stop:
+	@echo "⏹️ Stopping Docker container..."
+	@if [ -f ./docker-manage.sh ]; then \
+		chmod +x ./docker-manage.sh; \
+		./docker-manage.sh stop; \
+	else \
+		docker stop tempfile || echo "Container not running"; \
+	fi
+
+docker-logs:
+	@echo "📋 Showing Docker logs..."
+	@if [ -f ./docker-manage.sh ]; then \
+		chmod +x ./docker-manage.sh; \
+		./docker-manage.sh logs; \
+	else \
+		docker logs -f tempfile || echo "Container not found"; \
+	fi
+
+docker-health:
+	@echo "🏥 Checking Docker container health..."
+	@if [ -f ./docker-manage.sh ]; then \
+		chmod +x ./docker-manage.sh; \
+		./docker-manage.sh health; \
+	else \
+		curl -f http://localhost:3000/health || echo "Health check failed"; \
+	fi
+
+docker-clean:
+	@echo "🧹 Cleaning up Docker container..."
+	@if [ -f ./docker-manage.sh ]; then \
+		chmod +x ./docker-manage.sh; \
+		./docker-manage.sh clean; \
+	else \
+		docker rm -f tempfile || echo "Container not found"; \
+	fi
+
+docker-update:
+	@echo "⬆️ Updating to latest version..."
+	@if [ -f ./docker-manage.sh ]; then \
+		chmod +x ./docker-manage.sh; \
+		./docker-manage.sh update; \
+	else \
+		echo "⚠️ docker-manage.sh not found"; \
+	fi
+
+docker-dev-ghcr:
+	@echo "👨‍💻 Running development version from GHCR..."
+	@if [ -f ./docker-manage.sh ]; then \
+		chmod +x ./docker-manage.sh; \
+		./docker-manage.sh dev; \
+	else \
+		echo "⚠️ docker-manage.sh not found"; \
+	fi
+
+docker-prod-ghcr:
+	@echo "🏭 Running production version from GHCR..."
+	@if [ -f ./docker-manage.sh ]; then \
+		chmod +x ./docker-manage.sh; \
+		./docker-manage.sh prod; \
+	else \
+		echo "⚠️ docker-manage.sh not found"; \
+	fi
+
+## Docker Compose targets
+.PHONY: compose-up compose-down compose-logs compose-pull compose-restart
+
+compose-up:
+	@echo "🐳 Starting services with Docker Compose..."
 	docker-compose up -d
 
-## Docker compose down
-docker-down:
-	@echo "🐳 Stopping Docker Compose..."
+compose-down:
+	@echo "⏹️ Stopping services with Docker Compose..."
 	docker-compose down
+
+compose-logs:
+	@echo "📋 Showing Docker Compose logs..."
+	docker-compose logs -f
+
+compose-pull:
+	@echo "⬇️ Pulling latest images for compose..."
+	docker-compose pull
+
+compose-restart:
+	@echo "🔄 Restarting services..."
+	docker-compose restart
 
 ## Start Redis for development
 redis-dev:
@@ -232,12 +330,27 @@ help:
 	@echo "  security     - Run security scan"
 	@echo "  check        - Run all quality checks (fmt, lint, security, test)"
 	@echo ""
-	@echo "🐳 Docker:"
-	@echo "  docker-build - Build Docker image"
-	@echo "  docker-run   - Run Docker container"
-	@echo "  docker-up    - Start with Docker Compose"
-	@echo "  docker-down  - Stop Docker Compose"
-	@echo "  docker-health - Test Docker health check"
+	@echo "🐳 Docker (Local Build):"
+	@echo "  docker-build - Build Docker image locally"
+	@echo "  docker-run   - Run local Docker container"
+	@echo ""
+	@echo "📶 Docker (GHCR):"
+	@echo "  docker-pull      - Pull latest image from GHCR"
+	@echo "  docker-run-ghcr  - Run container from GHCR"
+	@echo "  docker-stop      - Stop running container"
+	@echo "  docker-logs      - Show container logs"
+	@echo "  docker-health    - Check container health"
+	@echo "  docker-clean     - Remove container"
+	@echo "  docker-update    - Update to latest version"
+	@echo "  docker-dev-ghcr  - Run development version"
+	@echo "  docker-prod-ghcr - Run production version"
+	@echo ""
+	@echo "📄 Docker Compose:"
+	@echo "  compose-up       - Start services with compose"
+	@echo "  compose-down     - Stop services"
+	@echo "  compose-logs     - Show compose logs"
+	@echo "  compose-pull     - Pull latest images"
+	@echo "  compose-restart  - Restart services"
 	@echo ""
 	@echo "🗄️  Redis:"
 	@echo "  redis-dev    - Start Redis for development"
@@ -251,8 +364,10 @@ help:
 	@echo "  help         - Show this help"
 	@echo ""
 	@echo "🚀 Quick Start:"
-	@echo "  make setup         # First time setup"
-	@echo "  make dev           # Start development"
-	@echo "  make dev-ratelimit # Test rate limiting"
-	@echo "  make check         # Run quality checks"
+	@echo "  make setup            # First time setup"
+	@echo "  make dev              # Start development"
+	@echo "  make dev-ratelimit    # Test rate limiting"
+	@echo "  make check            # Run quality checks"
+	@echo "  make docker-run-ghcr  # Run from GHCR"
+	@echo "  make compose-up       # Run with Docker Compose"
 	@echo ""

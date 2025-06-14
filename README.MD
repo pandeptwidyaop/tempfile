@@ -377,7 +377,73 @@ go run cmd/server/main.go
 
 ## 🐳 Docker Support
 
-### Using Docker
+### Using Pre-built Images from GitHub Container Registry (GHCR)
+
+The easiest way to run TempFiles is using our pre-built Docker images:
+
+```bash
+# Pull and run latest stable version
+docker pull ghcr.io/pandeptwidyaop/tempfile:latest
+docker run -d --name tempfile -p 3000:3000 \
+  -v $(pwd)/uploads:/app/uploads \
+  ghcr.io/pandeptwidyaop/tempfile:latest
+
+# Run specific version
+docker run -d --name tempfile -p 3000:3000 \
+  -v $(pwd)/uploads:/app/uploads \
+  ghcr.io/pandeptwidyaop/tempfile:v1.2.0
+
+# Run development version
+docker run -d --name tempfile -p 3000:3000 \
+  -e DEBUG=true \
+  -v $(pwd)/uploads:/app/uploads \
+  ghcr.io/pandeptwidyaop/tempfile:develop
+```
+
+### Using Docker Management Script
+
+We provide a convenient script for managing Docker containers:
+
+```bash
+# Make script executable
+chmod +x docker-manage.sh
+
+# Quick commands
+./docker-manage.sh run           # Run latest version
+./docker-manage.sh dev           # Run development version
+./docker-manage.sh prod          # Run production optimized
+./docker-manage.sh logs          # Show logs
+./docker-manage.sh health        # Check health
+./docker-manage.sh update        # Update to latest
+./docker-manage.sh stop          # Stop container
+./docker-manage.sh clean         # Remove container
+
+# Or use Makefile shortcuts
+make docker-run-ghcr             # Run from GHCR
+make docker-dev-ghcr             # Development version
+make docker-prod-ghcr            # Production optimized
+make docker-health               # Check health
+make docker-logs                 # Show logs
+make docker-update               # Update to latest
+```
+
+### Available Image Tags
+
+| Tag | Description | Use Case |
+|-----|-------------|-----------|
+| `latest` | Latest stable release | Production |
+| `vX.Y.Z` | Specific version | Production (pinned version) |
+| `develop` | Latest development build | Testing new features |
+| `feature-*` | Feature branch builds | Feature testing |
+| `main-sha` | Commit-specific builds | Debugging/testing |
+
+### Multi-Platform Support
+
+All images support multiple architectures:
+- **linux/amd64** - Standard x86_64
+- **linux/arm64** - ARM64 (Apple Silicon, ARM servers)
+
+### Using Local Docker Build
 
 ```bash
 # Build the image

@@ -4,12 +4,13 @@ on:
   push:
     branches: [ main ]
 
-# Add permissions for GitHub token
+# Add permissions for GitHub token and packages
 permissions:
   contents: write
   issues: write
   pull-requests: write
   actions: read
+  packages: write
 
 jobs:
   # Job untuk build dan release (simplified)
@@ -124,14 +125,49 @@ jobs:
         # List files
         ls -la
         
-    - name: 🐳 Build Docker Image
+    # NEW: Docker Build and Push to GHCR
+    - name: 🐳 Setup Docker Buildx
       if: steps.check.outputs.should-release == 'true'
-      run: |
-        # Build Docker image
-        docker build -t tempfile:latest .
-        
-        # Save Docker image as tar for release
-        docker save tempfile:latest | gzip > release/tempfile-docker.tar.gz
+      uses: docker/setup-buildx-action@v3
+
+    - name: 🔑 Login to GitHub Container Registry
+      if: steps.check.outputs.should-release == 'true'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 📝 Extract Metadata for Docker
+      if: steps.check.outputs.should-release == 'true'
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+        labels: |
+          org.opencontainers.image.title=Tempfile
+          org.opencontainers.image.description=A secure file sharing service
+          org.opencontainers.image.vendor=${{ github.repository_owner }}
+
+    - name: 🔨 Build and Push Docker Image to GHCR
+      if: steps.check.outputs.should-release == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          BUILD_VERSION=${{ github.sha }}
+          BUILD_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
         
     - name: 🏷️ Create Semantic Release
       if: steps.check.outputs.should-release == 'true'
@@ -148,6 +184,31 @@ jobs:
           @semantic-release/changelog
           @semantic-release/git
           conventional-changelog-conventionalcommits
+
+    # NEW: Re-tag Docker image with semantic version after release
+    - name: 🏷️ Re-tag Docker Image with Semantic Version
+      if: steps.check.outputs.should-release == 'true' && steps.semantic_release.outputs.new_release_published == 'true'
+      run: |
+        VERSION=${{ steps.semantic_release.outputs.new_release_version }}
+        REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+        
+        echo "🏷️ Re-tagging image with semantic version v${VERSION}"
+        
+        # Pull the latest image
+        docker pull ghcr.io/${REPO_LOWER}:latest
+        
+        # Tag with semantic version
+        docker tag ghcr.io/${REPO_LOWER}:latest ghcr.io/${REPO_LOWER}:v${VERSION}
+        docker tag ghcr.io/${REPO_LOWER}:latest ghcr.io/${REPO_LOWER}:${VERSION}
+        
+        # Push versioned tags
+        docker push ghcr.io/${REPO_LOWER}:v${VERSION}
+        docker push ghcr.io/${REPO_LOWER}:${VERSION}
+        
+        echo "✅ Docker image pushed with tags:"
+        echo "  - ghcr.io/${REPO_LOWER}:latest"
+        echo "  - ghcr.io/${REPO_LOWER}:v${VERSION}"
+        echo "  - ghcr.io/${REPO_LOWER}:${VERSION}"
         
     - name: 📤 Upload Release Assets
       if: steps.check.outputs.should-release == 'true' && steps.semantic_release.outputs.new_release_published == 'true'
@@ -155,14 +216,32 @@ jobs:
       with:
         tag_name: v${{ steps.semantic_release.outputs.new_release_version }}
         name: Release v${{ steps.semantic_release.outputs.new_release_version }}
-        body: ${{ steps.semantic_release.outputs.new_release_notes }}
+        body: |
+          ${{ steps.semantic_release.outputs.new_release_notes }}
+          
+          ## 🐳 Docker Images
+          
+          Pull the Docker image:
+          ```bash
+          # Latest version
+          docker pull ghcr.io/${{ github.repository }}:latest
+          
+          # Specific version
+          docker pull ghcr.io/${{ github.repository }}:v${{ steps.semantic_release.outputs.new_release_version }}
+          ```
+          
+          Run the container:
+          ```bash
+          docker run -d -p 3000:3000 \
+            -v $(pwd)/uploads:/app/uploads \
+            ghcr.io/${{ github.repository }}:v${{ steps.semantic_release.outputs.new_release_version }}
+          ```
         files: |
           release/tempfile-linux-amd64.tar.gz
           release/tempfile-linux-arm64.tar.gz
           release/tempfile-darwin-amd64.tar.gz
           release/tempfile-darwin-arm64.tar.gz
           release/tempfile-windows-amd64.zip
-          release/tempfile-docker.tar.gz
           release/checksums.txt
         draft: false
         prerelease: false
@@ -187,8 +266,19 @@ jobs:
         echo "- [macOS AMD64](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/tempfile-darwin-amd64.tar.gz)" >> $GITHUB_STEP_SUMMARY
         echo "- [macOS ARM64](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/tempfile-darwin-arm64.tar.gz)" >> $GITHUB_STEP_SUMMARY
         echo "- [Windows AMD64](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/tempfile-windows-amd64.zip)" >> $GITHUB_STEP_SUMMARY
-        echo "- [Docker Image](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/tempfile-docker.tar.gz)" >> $GITHUB_STEP_SUMMARY
         echo "- [Checksums](https://github.com/${{ github.repository }}/releases/download/v${VERSION}/checksums.txt)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🐳 Docker Images" >> $GITHUB_STEP_SUMMARY
+        echo "- **Latest**: \`ghcr.io/${REPO_LOWER}:latest\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Versioned**: \`ghcr.io/${REPO_LOWER}:v${VERSION}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Platforms**: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔧 Quick Start" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "# Pull and run the latest version" >> $GITHUB_STEP_SUMMARY
+        echo "docker pull ghcr.io/${REPO_LOWER}:v${VERSION}" >> $GITHUB_STEP_SUMMARY
+        echo "docker run -d -p 3000:3000 ghcr.io/${REPO_LOWER}:v${VERSION}" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
     - name: 🚫 No Release Needed
       if: steps.check.outputs.should-release == 'false'

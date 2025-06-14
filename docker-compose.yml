@@ -2,9 +2,13 @@ version: "3.8"
 
 services:
   tempfile:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # Use pre-built image from GHCR (comment out 'build' section below to use this)
+    image: ghcr.io/pandeptwidyaop/tempfile:latest
+    
+    # Or build locally (comment out 'image' line above to use this)
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
