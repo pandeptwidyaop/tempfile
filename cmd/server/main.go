@@ -36,7 +36,7 @@ func main() {
 	}
 
 	// Create upload directory if it doesn't exist
-	if err := os.MkdirAll(cfg.UploadDir, 0755); err != nil {
+	if err := os.MkdirAll(cfg.UploadDir, 0750); err != nil {
 		log.Fatal("Failed to create upload directory:", err)
 	}
 

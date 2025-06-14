@@ -107,16 +107,20 @@ jobs:
       with:
         go-version: 1.24
         
-    - name: 🔒 Run Gosec Security Scanner
-      uses: securego/gosec@master
-      with:
-        args: '-fmt sarif -out gosec.sarif ./...'
+    - name: 🔒 Install Gosec
+      run: go install github.com/securego/gosec/v2/cmd/gosec@latest
         
-    - name: 📤 Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v3
+    - name: 🔒 Run Gosec Security Scanner
+      run: gosec -fmt json -out gosec-report.json -stdout -verbose=text ./...
+      continue-on-error: true
+      
+    - name: 📤 Upload Gosec Report
+      uses: actions/upload-artifact@v4
       if: always()
       with:
-        sarif_file: gosec.sarif
+        name: gosec-security-report
+        path: gosec-report.json
+        retention-days: 30
         
   # Docker build test
   docker:

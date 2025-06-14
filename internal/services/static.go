@@ -93,8 +93,22 @@ func (s *StaticService) ServeFile(c *fiber.Ctx) error {
 
 	// Try filesystem first if enabled
 	if s.useFileSystem {
+		// Validate file path to prevent directory traversal
+		if strings.Contains(filePath, "..") || strings.HasPrefix(filePath, "/") {
+			return c.Status(400).SendString("Invalid file path")
+		}
+
 		fullPath := filepath.Join(s.staticDir, filePath)
-		fileData, err = os.ReadFile(fullPath)
+		// Additional security check: ensure the resolved path is within staticDir
+		if absStaticDir, err := filepath.Abs(s.staticDir); err == nil {
+			if absFullPath, err := filepath.Abs(fullPath); err == nil {
+				if !strings.HasPrefix(absFullPath, absStaticDir) {
+					return c.Status(400).SendString("Invalid file path")
+				}
+			}
+		}
+
+		fileData, err = os.ReadFile(fullPath) // #nosec G304 - Path is validated above
 		if err == nil {
 			source = "filesystem"
 			log.Printf("🔧 Served from filesystem: %s", filePath)
