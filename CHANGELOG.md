@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.1.0](https://github.com/pandeptwidyaop/tempfile/compare/v2.0.0...v2.1.0) (2025-06-14)
+
+### ✨ Features
+
+* implement hybrid loading for static and template files ([89f2bb7](https://github.com/pandeptwidyaop/tempfile/commit/89f2bb71d51d1e7fdda6b5931ad6f41dcb464bfe))
+
+### 🐛 Bug Fixes
+
+* fix running bin ([9678d32](https://github.com/pandeptwidyaop/tempfile/commit/9678d328063d3da7513debf77d4d3331635a5735))
+
 ## [2.0.0](https://github.com/pandeptwidyaop/tempfile/compare/v1.1.0...v2.0.0) (2025-06-14)
 
 ### ⚠ BREAKING CHANGES
