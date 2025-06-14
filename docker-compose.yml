@@ -15,8 +15,17 @@ services:
       - ENABLE_CORS=true
       - CORS_ORIGINS=*
       - ENABLE_WEB_UI=true
+      # Rate limiting configuration
+      - ENABLE_RATE_LIMIT=true
+      - RATE_LIMIT_STORE=redis
+      - REDIS_URL=redis://redis:6379
+      - RATE_LIMIT_UPLOADS_PER_MINUTE=10
+      - RATE_LIMIT_BYTES_PER_HOUR=209715200
+      - RATE_LIMIT_TRUSTED_PROXIES=172.16.0.0/12,10.0.0.0/8
     volumes:
       - ./uploads:/app/uploads
+    depends_on:
+      - redis
     restart: unless-stopped
     healthcheck:
       test:
@@ -39,3 +48,20 @@ services:
       # Traefik health check
       - "traefik.http.services.tempfile.loadbalancer.healthcheck.path=/health"
       - "traefik.http.services.tempfile.loadbalancer.healthcheck.interval=30s"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=false"
+
+volumes:
+  redis_data:

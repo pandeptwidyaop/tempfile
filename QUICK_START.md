@@ -86,7 +86,10 @@ git push origin feature/awesome-feature
 |---------|-------------|
 | `make setup` | First-time development setup |
 | `make dev` | Start development server |
-| `make test` | Run tests |
+| `make dev-ratelimit` | Start with rate limiting (memory) |
+| `make dev-redis` | Start with Redis rate limiting |
+| `make test` | Run all tests |
+| `make test-ratelimit` | Run rate limiting tests only |
 | `make check` | Run all quality checks |
 | `make commit` | Interactive commit helper |
 | `make build` | Build binary |
@@ -99,14 +102,17 @@ git push origin feature/awesome-feature
 # New feature
 feat: add drag and drop upload
 feat(api): add batch upload endpoint
+feat(ratelimit): implement Redis-based rate limiting
 
 # Bug fix
 fix: resolve memory leak in cleanup
 fix(ui): fix mobile responsive layout
+fix(ratelimit): handle concurrent rate limit checks
 
 # Documentation
 docs: add API usage examples
 docs(readme): update installation guide
+docs(deployment): add rate limiting configuration
 
 # Breaking change
 feat!: change upload API response format
@@ -158,6 +164,12 @@ git push origin main
 # Run all tests
 make test
 
+# Test rate limiting specifically
+make test-ratelimit
+
+# Test Redis integration (requires Docker)
+make test-redis
+
 # Test with coverage
 make test-coverage
 
@@ -168,7 +180,23 @@ make security
 make check
 ```
 
-## 🐳 Docker Development
+## 🚦 Rate Limiting Development
+
+```bash
+# Start Redis for development
+make redis-dev
+
+# Test with memory-based rate limiting
+make dev-ratelimit
+
+# Test with Redis-based rate limiting
+make dev-redis
+
+# Stop Redis when done
+make redis-stop
+```
+
+## � Docker Development
 
 ```bash
 # Build Docker image
@@ -219,6 +247,15 @@ FILE_EXPIRY_HOURS=1
 ENABLE_CORS=true
 ENABLE_WEB_UI=true
 DEBUG=false
+
+# Rate limiting (optional)
+ENABLE_RATE_LIMIT=true
+RATE_LIMIT_STORE=memory  # or 'redis' for distributed
+RATE_LIMIT_UPLOADS_PER_MINUTE=10
+RATE_LIMIT_BYTES_PER_HOUR=209715200  # 200MB
+
+# Redis configuration (if using Redis store)
+REDIS_URL=redis://localhost:6379
 ```
 
 ## ❗ Troubleshooting
@@ -248,6 +285,25 @@ chmod +x dev.sh
 make clean
 make deps
 make test
+```
+
+**Rate limiting not working:**
+```bash
+# Check if rate limiting is enabled
+ENABLE_RATE_LIMIT=true make dev
+
+# Test rate limiting
+curl -X POST -F "file=@test.txt" http://localhost:3000/
+# Repeat multiple times to trigger rate limit
+```
+
+**Redis connection issues:**
+```bash
+# Start Redis container
+make redis-dev
+
+# Check Redis connection
+docker exec redis-dev redis-cli ping
 ```
 
 ### Getting Help
