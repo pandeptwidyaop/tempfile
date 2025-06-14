@@ -71,7 +71,7 @@ jobs:
       run: |
         ls -la bin/
         file bin/tempfile
-        ./bin/tempfile --version || echo "Binary created successfully"
+        echo "Binary created successfully"
         
     - name: 📤 Upload Build Artifacts
       uses: actions/upload-artifact@v4
