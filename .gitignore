@@ -39,3 +39,4 @@ yarn.lock
 *.tar.gz
 *.zip
 checksums.txt
+server
