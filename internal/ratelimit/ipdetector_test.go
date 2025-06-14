@@ -145,6 +145,109 @@ func TestIPDetector_IsTrustedProxy(t *testing.T) {
 	}
 }
 
+func TestIPDetector_IsWhitelisted(t *testing.T) {
+	tests := []struct {
+		name         string
+		whitelistIPs []string
+		ip           string
+		expected     bool
+	}{
+		{
+			name:         "Exact IP match",
+			whitelistIPs: []string{"127.0.0.1", "203.0.113.1"},
+			ip:           "203.0.113.1",
+			expected:     true,
+		},
+		{
+			name:         "CIDR match",
+			whitelistIPs: []string{"192.168.0.0/16"},
+			ip:           "192.168.1.100",
+			expected:     true,
+		},
+		{
+			name:         "CIDR no match",
+			whitelistIPs: []string{"192.168.0.0/16"},
+			ip:           "10.0.0.1",
+			expected:     false,
+		},
+		{
+			name:         "IPv6 exact match",
+			whitelistIPs: []string{"2001:db8::1"},
+			ip:           "2001:db8::1",
+			expected:     true,
+		},
+		{
+			name:         "IPv6 CIDR match",
+			whitelistIPs: []string{"2001:db8::/32"},
+			ip:           "2001:db8::100",
+			expected:     true,
+		},
+		{
+			name:         "Not whitelisted",
+			whitelistIPs: []string{"127.0.0.1"},
+			ip:           "203.0.113.1",
+			expected:     false,
+		},
+		{
+			name:         "Empty whitelist",
+			whitelistIPs: []string{},
+			ip:           "203.0.113.1",
+			expected:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detector := NewIPDetectorWithWhitelist(
+				[]string{"127.0.0.1"},
+				GetDefaultIPHeaders(),
+				tt.whitelistIPs,
+			)
+			
+			if ipDet, ok := detector.(*ipDetector); ok {
+				result := ipDet.IsWhitelisted(tt.ip)
+				if result != tt.expected {
+					t.Errorf("IsWhitelisted() = %v, want %v", result, tt.expected)
+				}
+			} else {
+				t.Fatal("Expected *ipDetector type")
+			}
+		})
+	}
+}
+
+func TestNewIPDetectorWithWhitelist(t *testing.T) {
+	trustedProxies := []string{"127.0.0.1", "172.16.0.0/12"}
+	headers := []string{"X-Real-IP", "X-Forwarded-For"}
+	whitelistIPs := []string{"203.0.113.1", "192.168.0.0/16"}
+	
+	detector := NewIPDetectorWithWhitelist(trustedProxies, headers, whitelistIPs)
+	
+	if detector == nil {
+		t.Fatal("NewIPDetectorWithWhitelist() returned nil")
+	}
+	
+	// Test that it implements IPDetector interface
+	var _ IPDetector = detector
+	
+	// Test whitelist functionality
+	if ipDet, ok := detector.(*ipDetector); ok {
+		if !ipDet.IsWhitelisted("203.0.113.1") {
+			t.Error("Expected IP to be whitelisted")
+		}
+		
+		if !ipDet.IsWhitelisted("192.168.1.100") {
+			t.Error("Expected IP in CIDR range to be whitelisted")
+		}
+		
+		if ipDet.IsWhitelisted("10.0.0.1") {
+			t.Error("Expected IP to not be whitelisted")
+		}
+	} else {
+		t.Fatal("Expected *ipDetector type")
+	}
+}
+
 func TestGetDefaultTrustedProxies(t *testing.T) {
 	proxies := GetDefaultTrustedProxies()
 	

@@ -80,6 +80,8 @@ func main() {
 			WindowMinutes:    cfg.RateLimitWindowMinutes,
 			TrustedProxies:   cfg.RateLimitTrustedProxies,
 			IPHeaders:        cfg.RateLimitIPHeaders,
+			WhitelistIPs:     cfg.RateLimitWhitelistIPs,
+			CustomLimits:     convertCustomLimits(cfg.RateLimitCustomLimits),
 			RedisURL:         cfg.RedisURL,
 			RedisPassword:    cfg.RedisPassword,
 			RedisDB:          cfg.RedisDB,
@@ -92,13 +94,28 @@ func main() {
 			log.Fatal("Invalid rate limiter configuration:", err)
 		}
 		
-		// Create rate limiter (currently only memory store is implemented)
-		rateLimiter = ratelimit.NewDefaultMemoryRateLimiter(rateLimiterConfig)
+		// Create rate limiter based on store type
+		switch cfg.RateLimitStore {
+		case "redis":
+			var err error
+			rateLimiter, err = ratelimit.NewRedisRateLimiter(rateLimiterConfig)
+			if err != nil {
+				log.Fatal("Failed to create Redis rate limiter:", err)
+			}
+			log.Printf("✅ Redis rate limiter initialized")
+		case "memory":
+			rateLimiter = ratelimit.NewDefaultMemoryRateLimiter(rateLimiterConfig)
+			log.Printf("✅ Memory rate limiter initialized")
+		default:
+			log.Fatal("Invalid rate limit store:", cfg.RateLimitStore)
+		}
 		
-		log.Printf("✅ Rate limiter enabled: %d uploads/%d min, %s/hour",
+		log.Printf("✅ Rate limiter enabled: %d uploads/%d min, %s/hour, %d whitelisted IPs, %d custom endpoints",
 			cfg.RateLimitUploadsPerMinute,
 			cfg.RateLimitWindowMinutes,
-			utils.FormatBytes(cfg.RateLimitBytesPerHour))
+			utils.FormatBytes(cfg.RateLimitBytesPerHour),
+			len(cfg.RateLimitWhitelistIPs),
+			len(cfg.RateLimitCustomLimits))
 	}
 
 	// Initialize Fiber app
@@ -152,7 +169,11 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, staticService *services
 
 	// Rate limiting middleware (before routes)
 	if cfg.EnableRateLimit && rateLimiter != nil {
-		ipDetector := ratelimit.NewIPDetector(cfg.RateLimitTrustedProxies, cfg.RateLimitIPHeaders)
+		ipDetector := ratelimit.NewIPDetectorWithWhitelist(
+			cfg.RateLimitTrustedProxies,
+			cfg.RateLimitIPHeaders,
+			cfg.RateLimitWhitelistIPs,
+		)
 		
 		rateLimiterMiddleware := middleware.NewRateLimiter(middleware.RateLimiterConfig{
 			RateLimiter: rateLimiter,
@@ -169,6 +190,19 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, staticService *services
 		app.Get("/static/*", staticService.Handler())
 		log.Println("✅ Embedded static files configured at /static/*")
 	}
+}
+
+// convertCustomLimits converts config custom limits to rate limiter format
+func convertCustomLimits(configLimits map[string]config.RateLimitEndpointConfig) map[string]ratelimit.EndpointConfig {
+	result := make(map[string]ratelimit.EndpointConfig)
+	for endpoint, limit := range configLimits {
+		result[endpoint] = ratelimit.EndpointConfig{
+			UploadsPerMinute: limit.UploadsPerMinute,
+			BytesPerHour:     limit.BytesPerHour,
+			WindowMinutes:    limit.WindowMinutes,
+		}
+	}
+	return result
 }
 
 // setupRoutes configures application routes

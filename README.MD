@@ -170,6 +170,8 @@ TempFiles includes a powerful rate limiting system to prevent abuse and ensure f
 - **Smart IP Detection** - Accurate client IP detection behind reverse proxies and CDNs
 - **Sliding Window** - Precise rate limiting using sliding window algorithm
 - **Multiple Storage Backends** - In-memory (default) and Redis for distributed setups
+- **IP Whitelisting** - Bypass rate limits for trusted IPs and CIDR ranges
+- **Custom Endpoint Limits** - Different rate limits per endpoint/path
 - **Configurable Limits** - Flexible configuration via environment variables
 - **Graceful Responses** - User-friendly error messages with retry information
 
@@ -240,6 +242,31 @@ REDIS_URL=redis://your-redis-server:6379
 REDIS_PASSWORD=your-password
 ```
 
+### IP Whitelisting
+
+Bypass rate limiting for trusted IPs:
+
+```bash
+# Whitelist specific IPs and CIDR ranges
+RATE_LIMIT_WHITELIST_IPS=127.0.0.1,::1,192.168.0.0/16,10.0.0.0/8
+
+# Whitelisted IPs get unlimited access
+curl -H "X-Forwarded-For: 192.168.1.100" http://localhost:3000/upload
+# Response headers: X-RateLimit-Status: whitelisted
+```
+
+### Custom Endpoint Limits
+
+Set different rate limits for specific endpoints:
+
+```bash
+# Format: ENDPOINT_PATH:uploads_per_min:bytes_per_hour:window_min
+RATE_LIMIT_CUSTOM_ENDPOINTS="/api/upload:10:209715200:30,/bulk:2:52428800:60"
+
+# /api/upload: 10 uploads per 30 minutes, 200MB per hour
+# /bulk: 2 uploads per 60 minutes, 50MB per hour
+```
+
 ## ⚙️ Configuration
 
 TempFiles uses environment variables for configuration. Copy `.env.example` to `.env` and customize:
@@ -282,6 +309,8 @@ cp .env.example .env
 | `RATE_LIMIT_WINDOW_MINUTES` | `60` | Rate limit window in minutes |
 | `RATE_LIMIT_TRUSTED_PROXIES` | `127.0.0.1,::1,...` | Trusted proxy IPs/CIDRs |
 | `RATE_LIMIT_IP_HEADERS` | `CF-Connecting-IP,...` | IP detection header priority |
+| `RATE_LIMIT_WHITELIST_IPS` | `` | Whitelisted IPs (comma-separated) |
+| `RATE_LIMIT_CUSTOM_ENDPOINTS` | `` | Custom limits per endpoint |
 
 ### Redis Configuration (for distributed rate limiting)
 
@@ -326,6 +355,23 @@ go run cmd/server/main.go
 ENABLE_RATE_LIMIT=true \
 RATE_LIMIT_TRUSTED_PROXIES=173.245.48.0/20,103.21.244.0/22 \
 RATE_LIMIT_IP_HEADERS=CF-Connecting-IP,X-Forwarded-For \
+go run cmd/server/main.go
+```
+
+### Advanced Rate Limiting Examples
+
+```bash
+# Whitelist admin IPs with custom endpoint limits
+ENABLE_RATE_LIMIT=true \
+RATE_LIMIT_WHITELIST_IPS=192.168.1.0/24,203.0.113.100 \
+RATE_LIMIT_CUSTOM_ENDPOINTS="/api/bulk:1:52428800:120,/api/premium:20:1073741824:60" \
+go run cmd/server/main.go
+
+# Redis backend with distributed rate limiting
+ENABLE_RATE_LIMIT=true \
+RATE_LIMIT_STORE=redis \
+REDIS_URL=redis://redis-cluster:6379 \
+REDIS_PASSWORD=your-password \
 go run cmd/server/main.go
 ```
 
@@ -507,9 +553,11 @@ make build-all    # Build for all platforms
 - [x] **Health Checks** - Service monitoring
 - [x] **CORS Support** - API integration ready
 - [x] **Rate Limiting** - Upload and bandwidth limits with IP detection
+- [x] **Redis Backend** - Distributed rate limiting with Redis storage
+- [x] **IP Whitelisting** - Bypass rate limits for trusted IPs
+- [x] **Custom Endpoint Limits** - Different rate limits per endpoint
 
 ### Planned Features 🔮
-- [ ] **Redis Rate Limiting** - Distributed rate limiting with Redis backend
 - [ ] **S3 Integration** - Support for AWS S3 storage
 - [ ] **File Encryption** - Encrypt files at rest
 - [ ] **Custom Expiry** - Allow users to set custom expiry times

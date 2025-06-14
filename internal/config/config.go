@@ -49,6 +49,8 @@ type Config struct {
 	RateLimitWindowMinutes      int
 	RateLimitTrustedProxies     []string
 	RateLimitIPHeaders          []string
+	RateLimitWhitelistIPs       []string
+	RateLimitCustomLimits       map[string]RateLimitEndpointConfig
 	
 	// Redis config
 	RedisURL                    string
@@ -56,6 +58,13 @@ type Config struct {
 	RedisDB                     int
 	RedisPoolSize               int
 	RedisTimeout                int
+}
+
+// RateLimitEndpointConfig holds custom rate limits for specific endpoints
+type RateLimitEndpointConfig struct {
+	UploadsPerMinute int
+	BytesPerHour     int64
+	WindowMinutes    int
 }
 
 // Load loads configuration from environment variables and .env file
@@ -102,6 +111,8 @@ func Load() (*Config, error) {
 		RateLimitWindowMinutes:      getEnvAsIntOrDefault("RATE_LIMIT_WINDOW_MINUTES", 60),
 		RateLimitTrustedProxies:     getEnvAsStringSliceOrDefault("RATE_LIMIT_TRUSTED_PROXIES", []string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}),
 		RateLimitIPHeaders:          getEnvAsStringSliceOrDefault("RATE_LIMIT_IP_HEADERS", []string{"CF-Connecting-IP", "X-Real-IP", "X-Forwarded-For"}),
+		RateLimitWhitelistIPs:       getEnvAsStringSliceOrDefault("RATE_LIMIT_WHITELIST_IPS", []string{}),
+		RateLimitCustomLimits:       parseCustomRateLimits(),
 		
 		// Redis config
 		RedisURL:      getEnvOrDefault("REDIS_URL", "redis://localhost:6379"),
@@ -182,4 +193,39 @@ func (c *Config) ValidateTrustedProxies() error {
 		}
 	}
 	return nil
+}
+
+// parseCustomRateLimits parses custom rate limits from environment variables
+func parseCustomRateLimits() map[string]RateLimitEndpointConfig {
+	customLimits := make(map[string]RateLimitEndpointConfig)
+	
+	// Parse format: ENDPOINT_PATH:uploads_per_min:bytes_per_hour:window_min
+	// Example: RATE_LIMIT_CUSTOM_ENDPOINTS="/api/upload:10:209715200:30,/bulk:2:52428800:60"
+	customEndpoints := getEnvOrDefault("RATE_LIMIT_CUSTOM_ENDPOINTS", "")
+	if customEndpoints == "" {
+		return customLimits
+	}
+	
+	endpoints := strings.Split(customEndpoints, ",")
+	for _, endpoint := range endpoints {
+		parts := strings.Split(strings.TrimSpace(endpoint), ":")
+		if len(parts) != 4 {
+			continue
+		}
+		
+		path := parts[0]
+		uploadsPerMin, err1 := strconv.Atoi(parts[1])
+		bytesPerHour, err2 := strconv.ParseInt(parts[2], 10, 64)
+		windowMin, err3 := strconv.Atoi(parts[3])
+		
+		if err1 == nil && err2 == nil && err3 == nil {
+			customLimits[path] = RateLimitEndpointConfig{
+				UploadsPerMinute: uploadsPerMin,
+				BytesPerHour:     bytesPerHour,
+				WindowMinutes:    windowMin,
+			}
+		}
+	}
+	
+	return customLimits
 }

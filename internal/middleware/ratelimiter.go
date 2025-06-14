@@ -25,6 +25,15 @@ type RateLimiterConfig struct {
 	
 	// KeyGenerator allows custom key generation for rate limiting
 	KeyGenerator func(c *fiber.Ctx) string
+	
+	// EndpointExtractor extracts endpoint identifier for custom limits
+	EndpointExtractor func(c *fiber.Ctx) string
+}
+
+// RateLimiterWithEndpoint is an extended interface for endpoint-specific rate limiting
+type RateLimiterWithEndpoint interface {
+	ratelimit.RateLimiter
+	CheckLimitsForEndpoint(ip string, fileSize int64, endpoint string) (*ratelimit.LimitStatus, error)
 }
 
 // New creates a new rate limiter middleware
@@ -36,6 +45,10 @@ func NewRateLimiter(config RateLimiterConfig) fiber.Handler {
 	
 	if config.SkipPaths == nil {
 		config.SkipPaths = []string{"/health"}
+	}
+	
+	if config.EndpointExtractor == nil {
+		config.EndpointExtractor = defaultEndpointExtractor
 	}
 	
 	return func(c *fiber.Ctx) error {
@@ -59,8 +72,19 @@ func NewRateLimiter(config RateLimiterConfig) fiber.Handler {
 		// Get estimated file size for pre-validation
 		fileSize := getEstimatedFileSize(c)
 		
-		// Check rate limits
-		status, err := config.RateLimiter.CheckLimits(key, fileSize)
+		// Get endpoint for custom limits
+		endpoint := config.EndpointExtractor(c)
+		
+		// Check rate limits with endpoint-specific limits
+		var status *ratelimit.LimitStatus
+		var err error
+		
+		if rateLimiterExt, ok := config.RateLimiter.(RateLimiterWithEndpoint); ok {
+			status, err = rateLimiterExt.CheckLimitsForEndpoint(key, fileSize, endpoint)
+		} else {
+			status, err = config.RateLimiter.CheckLimits(key, fileSize)
+		}
+		
 		if err != nil {
 			// Check if it's a rate limit error
 			if rateLimitErr, ok := err.(*ratelimit.RateLimitError); ok {
@@ -78,6 +102,7 @@ func NewRateLimiter(config RateLimiterConfig) fiber.Handler {
 		c.Locals("rate_limit_key", key)
 		c.Locals("rate_limit_checked", true)
 		c.Locals("rate_limit_estimated_size", fileSize)
+		c.Locals("rate_limit_endpoint", endpoint)
 		
 		// Add rate limit headers to response
 		addRateLimitHeaders(c, status)
@@ -111,6 +136,12 @@ func NewRateLimiterPostProcess(rateLimiter ratelimit.RateLimiter) fiber.Handler 
 		
 		return c.Next()
 	}
+}
+
+// defaultEndpointExtractor extracts endpoint identifier from request
+func defaultEndpointExtractor(c *fiber.Ctx) string {
+	// Use method + path as endpoint identifier
+	return c.Method() + " " + c.Path()
 }
 
 // defaultKeyGenerator creates a default key generator using IP detection
@@ -236,9 +267,27 @@ func handleRateLimitExceeded(c *fiber.Ctx, rateLimitErr *ratelimit.RateLimitErro
 
 // addRateLimitHeaders adds rate limit information to response headers
 func addRateLimitHeaders(c *fiber.Ctx, status *ratelimit.LimitStatus) {
-	c.Set("X-RateLimit-Limit-Uploads", strconv.Itoa(status.UploadsLimit))
-	c.Set("X-RateLimit-Remaining-Uploads", strconv.Itoa(status.UploadsLimit-status.UploadsUsed))
-	c.Set("X-RateLimit-Limit-Bytes", strconv.FormatInt(status.BytesLimit, 10))
-	c.Set("X-RateLimit-Remaining-Bytes", strconv.FormatInt(status.BytesLimit-status.BytesUsed, 10))
-	c.Set("X-RateLimit-Reset", strconv.FormatInt(status.ResetTime.Unix(), 10))
+	// Handle unlimited (whitelisted) IPs
+	if status.UploadsLimit == -1 {
+		c.Set("X-RateLimit-Limit-Uploads", "unlimited")
+		c.Set("X-RateLimit-Remaining-Uploads", "unlimited")
+		c.Set("X-RateLimit-Limit-Bytes", "unlimited")
+		c.Set("X-RateLimit-Remaining-Bytes", "unlimited")
+		c.Set("X-RateLimit-Status", "whitelisted")
+	} else {
+		c.Set("X-RateLimit-Limit-Uploads", strconv.Itoa(status.UploadsLimit))
+		remainingUploads := status.UploadsLimit - status.UploadsUsed
+		if remainingUploads < 0 {
+			remainingUploads = 0
+		}
+		c.Set("X-RateLimit-Remaining-Uploads", strconv.Itoa(remainingUploads))
+		c.Set("X-RateLimit-Limit-Bytes", strconv.FormatInt(status.BytesLimit, 10))
+		
+		remainingBytes := status.BytesLimit - status.BytesUsed
+		if remainingBytes < 0 {
+			remainingBytes = 0
+		}
+		c.Set("X-RateLimit-Remaining-Bytes", strconv.FormatInt(remainingBytes, 10))
+		c.Set("X-RateLimit-Reset", strconv.FormatInt(status.ResetTime.Unix(), 10))
+	}
 }

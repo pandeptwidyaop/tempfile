@@ -44,6 +44,9 @@ type RateLimiter interface {
 	// CheckLimits verifies if an IP can upload a file of the given size
 	CheckLimits(ip string, fileSize int64) (*LimitStatus, error)
 	
+	// CheckLimitsForEndpoint verifies if an IP can upload a file with endpoint-specific limits
+	CheckLimitsForEndpoint(ip string, fileSize int64, endpoint string) (*LimitStatus, error)
+	
 	// UpdateCounters increments the counters after a successful upload
 	UpdateCounters(ip string, fileSize int64) error
 	
@@ -71,9 +74,25 @@ type Config struct {
 	WindowMinutes           int
 	TrustedProxies          []string
 	IPHeaders               []string
+	WhitelistIPs            []string
+	CustomLimits            map[string]EndpointConfig
 	RedisURL                string
 	RedisPassword           string
 	RedisDB                 int
 	RedisPoolSize           int
 	RedisTimeout            int
+}
+
+// EndpointConfig holds custom rate limits for specific endpoints
+type EndpointConfig struct {
+	UploadsPerMinute int
+	BytesPerHour     int64
+	WindowMinutes    int
+}
+
+// AtomicStore extends Store with atomic operations for Redis
+type AtomicStore interface {
+	Store
+	// AtomicCheckAndIncrement performs atomic rate limit check and increment
+	AtomicCheckAndIncrement(ip string, fileSize int64, window time.Duration, uploadLimit int, bytesLimit int64) (bool, int, int64, string, error)
 }

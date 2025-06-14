@@ -10,13 +10,21 @@ type ipDetector struct {
 	trustedProxies map[string]bool
 	trustedCIDRs   []*net.IPNet
 	headerPriority []string
+	whitelistIPs   map[string]bool
+	whitelistCIDRs []*net.IPNet
 }
 
 // NewIPDetector creates a new IP detector with the given configuration
 func NewIPDetector(trustedProxies []string, headerPriority []string) IPDetector {
+	return NewIPDetectorWithWhitelist(trustedProxies, headerPriority, []string{})
+}
+
+// NewIPDetectorWithWhitelist creates a new IP detector with whitelist support
+func NewIPDetectorWithWhitelist(trustedProxies []string, headerPriority []string, whitelistIPs []string) IPDetector {
 	detector := &ipDetector{
 		trustedProxies: make(map[string]bool),
 		headerPriority: headerPriority,
+		whitelistIPs:   make(map[string]bool),
 	}
 	
 	// Parse trusted proxies
@@ -32,6 +40,22 @@ func NewIPDetector(trustedProxies []string, headerPriority []string) IPDetector 
 		} else if ip := net.ParseIP(proxy); ip != nil {
 			// Parse as individual IP
 			detector.trustedProxies[proxy] = true
+		}
+	}
+	
+	// Parse whitelist IPs
+	for _, ip := range whitelistIPs {
+		ip = strings.TrimSpace(ip)
+		if ip == "" {
+			continue
+		}
+		
+		// Try to parse as CIDR first
+		if _, cidr, err := net.ParseCIDR(ip); err == nil {
+			detector.whitelistCIDRs = append(detector.whitelistCIDRs, cidr)
+		} else if parsedIP := net.ParseIP(ip); parsedIP != nil {
+			// Parse as individual IP
+			detector.whitelistIPs[ip] = true
 		}
 	}
 	
@@ -67,6 +91,28 @@ func (d *ipDetector) IsTrustedProxy(ip string) bool {
 	
 	// Check CIDR ranges
 	for _, cidr := range d.trustedCIDRs {
+		if cidr.Contains(parsedIP) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// IsWhitelisted checks if an IP is in the whitelist
+func (d *ipDetector) IsWhitelisted(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+	
+	// Check individual IPs
+	if d.whitelistIPs[ip] {
+		return true
+	}
+	
+	// Check CIDR ranges
+	for _, cidr := range d.whitelistCIDRs {
 		if cidr.Contains(parsedIP) {
 			return true
 		}
