@@ -29,18 +29,18 @@ type HealthResponse struct {
 
 // WebPageData represents data passed to web templates
 type WebPageData struct {
-	Title             string
-	Theme             string
-	FileExpiryHours   int
-	MaxFileSizeHuman  string
-	BaseURL           string
-	Filename          string
-	OriginalName      string
-	Size              string
-	SizeHuman         string
-	ExpiresAt         string
-	ExpiresIn         string
-	ErrorTitle        string
-	ErrorMessage      string
-	ErrorDetail       string
+	Title            string
+	Theme            string
+	FileExpiryHours  int
+	MaxFileSizeHuman string
+	BaseURL          string
+	Filename         string
+	OriginalName     string
+	Size             string
+	SizeHuman        string
+	ExpiresAt        string
+	ExpiresIn        string
+	ErrorTitle       string
+	ErrorMessage     string
+	ErrorDetail      string
 }

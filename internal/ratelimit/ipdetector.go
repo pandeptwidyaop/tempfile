@@ -26,14 +26,14 @@ func NewIPDetectorWithWhitelist(trustedProxies []string, headerPriority []string
 		headerPriority: headerPriority,
 		whitelistIPs:   make(map[string]bool),
 	}
-	
+
 	// Parse trusted proxies
 	for _, proxy := range trustedProxies {
 		proxy = strings.TrimSpace(proxy)
 		if proxy == "" {
 			continue
 		}
-		
+
 		// Try to parse as CIDR first
 		if _, cidr, err := net.ParseCIDR(proxy); err == nil {
 			detector.trustedCIDRs = append(detector.trustedCIDRs, cidr)
@@ -42,14 +42,14 @@ func NewIPDetectorWithWhitelist(trustedProxies []string, headerPriority []string
 			detector.trustedProxies[proxy] = true
 		}
 	}
-	
+
 	// Parse whitelist IPs
 	for _, ip := range whitelistIPs {
 		ip = strings.TrimSpace(ip)
 		if ip == "" {
 			continue
 		}
-		
+
 		// Try to parse as CIDR first
 		if _, cidr, err := net.ParseCIDR(ip); err == nil {
 			detector.whitelistCIDRs = append(detector.whitelistCIDRs, cidr)
@@ -58,7 +58,7 @@ func NewIPDetectorWithWhitelist(trustedProxies []string, headerPriority []string
 			detector.whitelistIPs[ip] = true
 		}
 	}
-	
+
 	return detector
 }
 
@@ -72,7 +72,7 @@ func (d *ipDetector) GetRealIP(headers map[string]string, remoteAddr string) str
 			}
 		}
 	}
-	
+
 	// Fallback to remote address
 	return d.extractIPFromAddr(remoteAddr)
 }
@@ -83,19 +83,19 @@ func (d *ipDetector) IsTrustedProxy(ip string) bool {
 	if parsedIP == nil {
 		return false
 	}
-	
+
 	// Check individual IPs
 	if d.trustedProxies[ip] {
 		return true
 	}
-	
+
 	// Check CIDR ranges
 	for _, cidr := range d.trustedCIDRs {
 		if cidr.Contains(parsedIP) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -105,19 +105,19 @@ func (d *ipDetector) IsWhitelisted(ip string) bool {
 	if parsedIP == nil {
 		return false
 	}
-	
+
 	// Check individual IPs
 	if d.whitelistIPs[ip] {
 		return true
 	}
-	
+
 	// Check CIDR ranges
 	for _, cidr := range d.whitelistCIDRs {
 		if cidr.Contains(parsedIP) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -125,15 +125,15 @@ func (d *ipDetector) IsWhitelisted(ip string) bool {
 func (d *ipDetector) parseIPFromHeader(headerValue string) string {
 	// Handle X-Forwarded-For format: "client, proxy1, proxy2"
 	ips := strings.Split(headerValue, ",")
-	
+
 	for _, ipStr := range ips {
 		ip := strings.TrimSpace(ipStr)
-		
+
 		// Skip empty values
 		if ip == "" {
 			continue
 		}
-		
+
 		// Extract IP from "ip:port" format
 		if colonIndex := strings.LastIndex(ip, ":"); colonIndex != -1 {
 			// Check if this looks like IPv6
@@ -144,21 +144,21 @@ func (d *ipDetector) parseIPFromHeader(headerValue string) string {
 				ip = ip[:colonIndex]
 			}
 		}
-		
+
 		// Validate IP format
 		if parsedIP := net.ParseIP(ip); parsedIP != nil {
 			// Skip trusted proxies and private IPs (unless from trusted proxy)
 			if !d.IsTrustedProxy(ip) && !d.isPrivateIP(parsedIP) {
 				return ip
 			}
-			
+
 			// If it's a private IP but we're behind a trusted proxy, use it
 			if d.isPrivateIP(parsedIP) {
 				return ip
 			}
 		}
 	}
-	
+
 	return ""
 }
 
@@ -179,19 +179,19 @@ func (d *ipDetector) isPrivateIP(ip net.IP) bool {
 		"192.168.0.0/16",
 		"127.0.0.0/8",
 	}
-	
+
 	// Private IPv6 ranges
 	private6 := []string{
 		"::1/128",
 		"fc00::/7",
 		"fe80::/10",
 	}
-	
+
 	ranges := private4
 	if ip.To4() == nil {
 		ranges = append(ranges, private6...)
 	}
-	
+
 	for _, cidr := range ranges {
 		if _, network, err := net.ParseCIDR(cidr); err == nil {
 			if network.Contains(ip) {
@@ -199,7 +199,7 @@ func (d *ipDetector) isPrivateIP(ip net.IP) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 

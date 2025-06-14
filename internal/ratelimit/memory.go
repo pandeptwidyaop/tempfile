@@ -29,10 +29,10 @@ func NewMemoryStore(maxEntries int, cleanupInterval time.Duration) Store {
 		cleanupTick: cleanupInterval,
 		stopCleanup: make(chan struct{}),
 	}
-	
+
 	// Start cleanup goroutine
 	go store.cleanupLoop()
-	
+
 	return store
 }
 
@@ -40,25 +40,25 @@ func NewMemoryStore(maxEntries int, cleanupInterval time.Duration) Store {
 func (s *memoryStore) GetUploadCount(ip string, window time.Duration) (int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	if s.closed {
 		return 0, ErrStoreClosed
 	}
-	
+
 	records, exists := s.uploads[ip]
 	if !exists {
 		return 0, nil
 	}
-	
+
 	cutoff := time.Now().Add(-window)
 	count := 0
-	
+
 	for _, record := range records {
 		if record.Timestamp.After(cutoff) {
 			count++
 		}
 	}
-	
+
 	return count, nil
 }
 
@@ -66,25 +66,25 @@ func (s *memoryStore) GetUploadCount(ip string, window time.Duration) (int, erro
 func (s *memoryStore) GetBytesUsed(ip string, window time.Duration) (int64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	if s.closed {
 		return 0, ErrStoreClosed
 	}
-	
+
 	records, exists := s.uploads[ip]
 	if !exists {
 		return 0, nil
 	}
-	
+
 	cutoff := time.Now().Add(-window)
 	var totalBytes int64
-	
+
 	for _, record := range records {
 		if record.Timestamp.After(cutoff) {
 			totalBytes += record.FileSize
 		}
 	}
-	
+
 	return totalBytes, nil
 }
 
@@ -92,30 +92,30 @@ func (s *memoryStore) GetBytesUsed(ip string, window time.Duration) (int64, erro
 func (s *memoryStore) IncrementUpload(ip string, fileSize int64, window time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.closed {
 		return ErrStoreClosed
 	}
-	
+
 	// Check if we're at max capacity
 	if len(s.uploads) >= s.maxEntries {
 		// Try to clean up first
 		s.cleanupExpiredEntries(window)
-		
+
 		// If still at capacity, reject
 		if len(s.uploads) >= s.maxEntries {
 			return ErrStoreCapacityExceeded
 		}
 	}
-	
+
 	now := time.Now()
 	record := UploadRecord{
 		Timestamp: now,
 		FileSize:  fileSize,
 	}
-	
+
 	s.uploads[ip] = append(s.uploads[ip], record)
-	
+
 	return nil
 }
 
@@ -128,29 +128,29 @@ func (s *memoryStore) Cleanup() error {
 func (s *memoryStore) CleanupWithWindow(window time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.closed {
 		return ErrStoreClosed
 	}
-	
+
 	s.cleanupExpiredEntries(window)
-	
+
 	return nil
 }
 
 // cleanupExpiredEntries removes expired entries (must be called with lock held)
 func (s *memoryStore) cleanupExpiredEntries(window time.Duration) {
 	cutoff := time.Now().Add(-window)
-	
+
 	for ip, records := range s.uploads {
 		var validRecords []UploadRecord
-		
+
 		for _, record := range records {
 			if record.Timestamp.After(cutoff) {
 				validRecords = append(validRecords, record)
 			}
 		}
-		
+
 		if len(validRecords) == 0 {
 			delete(s.uploads, ip)
 		} else {
@@ -163,11 +163,11 @@ func (s *memoryStore) cleanupExpiredEntries(window time.Duration) {
 func (s *memoryStore) cleanupLoop() {
 	ticker := time.NewTicker(s.cleanupTick)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
-			s.Cleanup()
+			_ = s.Cleanup()
 		case <-s.stopCleanup:
 			return
 		}
@@ -178,11 +178,11 @@ func (s *memoryStore) cleanupLoop() {
 func (s *memoryStore) HealthCheck() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	if s.closed {
 		return ErrStoreClosed
 	}
-	
+
 	return nil
 }
 
@@ -190,15 +190,15 @@ func (s *memoryStore) HealthCheck() error {
 func (s *memoryStore) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.closed {
 		return nil
 	}
-	
+
 	s.closed = true
 	close(s.stopCleanup)
 	s.uploads = nil
-	
+
 	return nil
 }
 
@@ -206,12 +206,12 @@ func (s *memoryStore) Close() error {
 func (s *memoryStore) GetStats() map[string]interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	totalRecords := 0
 	for _, records := range s.uploads {
 		totalRecords += len(records)
 	}
-	
+
 	return map[string]interface{}{
 		"type":          "memory",
 		"active_ips":    len(s.uploads),

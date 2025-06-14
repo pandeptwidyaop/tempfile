@@ -13,19 +13,19 @@ import (
 type RateLimiterConfig struct {
 	// RateLimiter is the rate limiter instance to use
 	RateLimiter ratelimit.RateLimiter
-	
+
 	// IPDetector is the IP detector instance to use
 	IPDetector ratelimit.IPDetector
-	
+
 	// SkipPaths are paths that should skip rate limiting
 	SkipPaths []string
-	
+
 	// SkipSuccessfulRequests if true, only failed requests count towards rate limit
 	SkipSuccessfulRequests bool
-	
+
 	// KeyGenerator allows custom key generation for rate limiting
 	KeyGenerator func(c *fiber.Ctx) string
-	
+
 	// EndpointExtractor extracts endpoint identifier for custom limits
 	EndpointExtractor func(c *fiber.Ctx) string
 }
@@ -42,15 +42,15 @@ func NewRateLimiter(config RateLimiterConfig) fiber.Handler {
 	if config.KeyGenerator == nil {
 		config.KeyGenerator = defaultKeyGenerator(config.IPDetector)
 	}
-	
+
 	if config.SkipPaths == nil {
 		config.SkipPaths = []string{"/health"}
 	}
-	
+
 	if config.EndpointExtractor == nil {
 		config.EndpointExtractor = defaultEndpointExtractor
 	}
-	
+
 	return func(c *fiber.Ctx) error {
 		// Skip rate limiting for certain paths
 		path := c.Path()
@@ -59,7 +59,7 @@ func NewRateLimiter(config RateLimiterConfig) fiber.Handler {
 				return c.Next()
 			}
 		}
-		
+
 		// Generate key (usually IP address)
 		key := config.KeyGenerator(c)
 		if key == "" {
@@ -68,45 +68,45 @@ func NewRateLimiter(config RateLimiterConfig) fiber.Handler {
 				"code":  "IP_DETECTION_FAILED",
 			})
 		}
-		
+
 		// Get estimated file size for pre-validation
 		fileSize := getEstimatedFileSize(c)
-		
+
 		// Get endpoint for custom limits
 		endpoint := config.EndpointExtractor(c)
-		
+
 		// Check rate limits with endpoint-specific limits
 		var status *ratelimit.LimitStatus
 		var err error
-		
+
 		if rateLimiterExt, ok := config.RateLimiter.(RateLimiterWithEndpoint); ok {
 			status, err = rateLimiterExt.CheckLimitsForEndpoint(key, fileSize, endpoint)
 		} else {
 			status, err = config.RateLimiter.CheckLimits(key, fileSize)
 		}
-		
+
 		if err != nil {
 			// Check if it's a rate limit error
 			if rateLimitErr, ok := err.(*ratelimit.RateLimitError); ok {
 				return handleRateLimitExceeded(c, rateLimitErr, status)
 			}
-			
+
 			// Other errors (store errors, etc.)
 			return c.Status(500).JSON(fiber.Map{
 				"error": "Rate limit check failed",
 				"code":  "RATE_LIMIT_ERROR",
 			})
 		}
-		
+
 		// Store information for post-processing
 		c.Locals("rate_limit_key", key)
 		c.Locals("rate_limit_checked", true)
 		c.Locals("rate_limit_estimated_size", fileSize)
 		c.Locals("rate_limit_endpoint", endpoint)
-		
+
 		// Add rate limit headers to response
 		addRateLimitHeaders(c, status)
-		
+
 		return c.Next()
 	}
 }
@@ -125,15 +125,17 @@ func NewRateLimiterPostProcess(rateLimiter ratelimit.RateLimiter) fiber.Handler 
 						actualSize = estimatedSize.(int64)
 					}
 				}
-				
+
 				// Update counters
 				if err := rateLimiter.UpdateCounters(key.(string), actualSize); err != nil {
 					// Log error but don't fail the request
+					// This is a background operation
 					// TODO: Add proper logging
+					_ = err // Explicitly ignore error for now
 				}
 			}
 		}
-		
+
 		return c.Next()
 	}
 }
@@ -152,10 +154,10 @@ func defaultKeyGenerator(ipDetector ratelimit.IPDetector) func(c *fiber.Ctx) str
 		c.Request().Header.VisitAll(func(key, value []byte) {
 			headers[string(key)] = string(value)
 		})
-		
+
 		// Get remote address
 		remoteAddr := c.Context().RemoteAddr().String()
-		
+
 		// Detect real IP
 		return ipDetector.GetRealIP(headers, remoteAddr)
 	}
@@ -169,14 +171,14 @@ func getEstimatedFileSize(c *fiber.Ctx) int64 {
 			return size
 		}
 	}
-	
+
 	// Try to get from multipart form (this might parse the form)
 	if form, err := c.MultipartForm(); err == nil && form != nil {
 		if files := form.File["file"]; len(files) > 0 {
 			return files[0].Size
 		}
 	}
-	
+
 	// Default to 0 if we can't determine size
 	return 0
 }
@@ -189,14 +191,14 @@ func getActualFileSize(c *fiber.Ctx) int64 {
 			return size
 		}
 	}
-	
+
 	// Try to get from multipart form again
 	if form, err := c.MultipartForm(); err == nil && form != nil {
 		if files := form.File["file"]; len(files) > 0 {
 			return files[0].Size
 		}
 	}
-	
+
 	return 0
 }
 
@@ -204,11 +206,11 @@ func getActualFileSize(c *fiber.Ctx) int64 {
 func handleRateLimitExceeded(c *fiber.Ctx, rateLimitErr *ratelimit.RateLimitError, status *ratelimit.LimitStatus) error {
 	// Set Retry-After header
 	c.Set("Retry-After", strconv.Itoa(rateLimitErr.RetryAfter))
-	
+
 	// Determine if this is a web request or API request
 	acceptHeader := c.Get("Accept")
 	isWebRequest := strings.Contains(acceptHeader, "text/html")
-	
+
 	if isWebRequest {
 		// For web requests, return HTML error page
 		return c.Status(429).SendString(fmt.Sprintf(`
@@ -241,7 +243,7 @@ func handleRateLimitExceeded(c *fiber.Ctx, rateLimitErr *ratelimit.RateLimitErro
 			rateLimitErr.RetryAfter,
 		))
 	}
-	
+
 	// For API requests, return JSON
 	return c.Status(429).JSON(fiber.Map{
 		"error":   "Rate limit exceeded",
@@ -282,7 +284,7 @@ func addRateLimitHeaders(c *fiber.Ctx, status *ratelimit.LimitStatus) {
 		}
 		c.Set("X-RateLimit-Remaining-Uploads", strconv.Itoa(remainingUploads))
 		c.Set("X-RateLimit-Limit-Bytes", strconv.FormatInt(status.BytesLimit, 10))
-		
+
 		remainingBytes := status.BytesLimit - status.BytesUsed
 		if remainingBytes < 0 {
 			remainingBytes = 0

@@ -27,7 +27,7 @@ func main() {
 	if err := cfg.Validate(); err != nil {
 		log.Fatal("Invalid configuration:", err)
 	}
-	
+
 	// Validate trusted proxies if rate limiting is enabled
 	if cfg.EnableRateLimit {
 		if err := cfg.ValidateTrustedProxies(); err != nil {
@@ -88,12 +88,12 @@ func main() {
 			RedisPoolSize:    cfg.RedisPoolSize,
 			RedisTimeout:     cfg.RedisTimeout,
 		}
-		
+
 		// Validate rate limiter configuration
 		if err := ratelimit.ValidateConfig(rateLimiterConfig); err != nil {
 			log.Fatal("Invalid rate limiter configuration:", err)
 		}
-		
+
 		// Create rate limiter based on store type
 		switch cfg.RateLimitStore {
 		case "redis":
@@ -109,7 +109,7 @@ func main() {
 		default:
 			log.Fatal("Invalid rate limit store:", cfg.RateLimitStore)
 		}
-		
+
 		log.Printf("✅ Rate limiter enabled: %d uploads/%d min, %s/hour, %d whitelisted IPs, %d custom endpoints",
 			cfg.RateLimitUploadsPerMinute,
 			cfg.RateLimitWindowMinutes,
@@ -174,13 +174,13 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, staticService *services
 			cfg.RateLimitIPHeaders,
 			cfg.RateLimitWhitelistIPs,
 		)
-		
+
 		rateLimiterMiddleware := middleware.NewRateLimiter(middleware.RateLimiterConfig{
 			RateLimiter: rateLimiter,
 			IPDetector:  ipDetector,
 			SkipPaths:   []string{"/health", "/static"},
 		})
-		
+
 		app.Use(rateLimiterMiddleware)
 		log.Println("✅ Rate limiting middleware configured")
 	}
@@ -215,7 +215,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config, apiHandler *handlers.APIHan
 		// Web UI routes (specific routes first)
 		app.Get("/success", webHandler.SuccessPage)
 		app.Get("/", webHandler.UploadPage)
-		
+
 		// Upload route with post-processing middleware
 		if cfg.EnableRateLimit && rateLimiter != nil {
 			postProcessMiddleware := middleware.NewRateLimiterPostProcess(rateLimiter)
@@ -254,7 +254,7 @@ func printStartupInfo(cfg *config.Config) {
 		log.Printf("   Static Assets: Embedded (standalone binary)")
 	}
 	log.Printf("   Debug Mode: %v", cfg.Debug)
-	
+
 	// Rate limiting info
 	if cfg.EnableRateLimit {
 		log.Printf("   Rate Limiting: Enabled")

@@ -29,11 +29,8 @@ func (s *CleanupService) Start() {
 
 	log.Printf("🧹 Cleanup routine started (interval: %d second(s))", s.config.CleanupIntervalSeconds)
 
-	for {
-		select {
-		case <-ticker.C:
-			s.cleanupExpiredFiles()
-		}
+	for range ticker.C {
+		s.cleanupExpiredFiles()
 	}
 }
 

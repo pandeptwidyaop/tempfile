@@ -6,11 +6,11 @@ import (
 
 func TestIPDetector_GetRealIP(t *testing.T) {
 	tests := []struct {
-		name         string
+		name           string
 		trustedProxies []string
-		headers      map[string]string
-		remoteAddr   string
-		expected     string
+		headers        map[string]string
+		remoteAddr     string
+		expected       string
 	}{
 		{
 			name:           "Direct connection",
@@ -80,7 +80,7 @@ func TestIPDetector_GetRealIP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			detector := NewIPDetector(tt.trustedProxies, GetDefaultIPHeaders())
 			result := detector.GetRealIP(tt.headers, tt.remoteAddr)
-			
+
 			if result != tt.expected {
 				t.Errorf("GetRealIP() = %v, want %v", result, tt.expected)
 			}
@@ -137,7 +137,7 @@ func TestIPDetector_IsTrustedProxy(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			detector := NewIPDetector(tt.trustedProxies, GetDefaultIPHeaders())
 			result := detector.IsTrustedProxy(tt.ip)
-			
+
 			if result != tt.expected {
 				t.Errorf("IsTrustedProxy() = %v, want %v", result, tt.expected)
 			}
@@ -203,7 +203,7 @@ func TestIPDetector_IsWhitelisted(t *testing.T) {
 				GetDefaultIPHeaders(),
 				tt.whitelistIPs,
 			)
-			
+
 			if ipDet, ok := detector.(*ipDetector); ok {
 				result := ipDet.IsWhitelisted(tt.ip)
 				if result != tt.expected {
@@ -220,26 +220,26 @@ func TestNewIPDetectorWithWhitelist(t *testing.T) {
 	trustedProxies := []string{"127.0.0.1", "172.16.0.0/12"}
 	headers := []string{"X-Real-IP", "X-Forwarded-For"}
 	whitelistIPs := []string{"203.0.113.1", "192.168.0.0/16"}
-	
+
 	detector := NewIPDetectorWithWhitelist(trustedProxies, headers, whitelistIPs)
-	
+
 	if detector == nil {
 		t.Fatal("NewIPDetectorWithWhitelist() returned nil")
 	}
-	
+
 	// Test that it implements IPDetector interface
 	var _ IPDetector = detector
-	
+
 	// Test whitelist functionality
 	if ipDet, ok := detector.(*ipDetector); ok {
 		if !ipDet.IsWhitelisted("203.0.113.1") {
 			t.Error("Expected IP to be whitelisted")
 		}
-		
+
 		if !ipDet.IsWhitelisted("192.168.1.100") {
 			t.Error("Expected IP in CIDR range to be whitelisted")
 		}
-		
+
 		if ipDet.IsWhitelisted("10.0.0.1") {
 			t.Error("Expected IP to not be whitelisted")
 		}
@@ -250,11 +250,11 @@ func TestNewIPDetectorWithWhitelist(t *testing.T) {
 
 func TestGetDefaultTrustedProxies(t *testing.T) {
 	proxies := GetDefaultTrustedProxies()
-	
+
 	if len(proxies) == 0 {
 		t.Error("GetDefaultTrustedProxies() should return non-empty slice")
 	}
-	
+
 	// Check that localhost is included
 	found := false
 	for _, proxy := range proxies {
@@ -263,7 +263,7 @@ func TestGetDefaultTrustedProxies(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !found {
 		t.Error("GetDefaultTrustedProxies() should include 127.0.0.1")
 	}
@@ -271,11 +271,11 @@ func TestGetDefaultTrustedProxies(t *testing.T) {
 
 func TestGetDefaultIPHeaders(t *testing.T) {
 	headers := GetDefaultIPHeaders()
-	
+
 	if len(headers) == 0 {
 		t.Error("GetDefaultIPHeaders() should return non-empty slice")
 	}
-	
+
 	// Check that CF-Connecting-IP is first (highest priority)
 	if headers[0] != "CF-Connecting-IP" {
 		t.Errorf("GetDefaultIPHeaders() first header should be CF-Connecting-IP, got %s", headers[0])
@@ -289,7 +289,7 @@ func BenchmarkIPDetector_GetRealIP(b *testing.B) {
 		"X-Real-IP":       "203.0.113.1",
 	}
 	remoteAddr := "127.0.0.1:12345"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		detector.GetRealIP(headers, remoteAddr)
