@@ -2,9 +2,11 @@ package utils
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 // FormatBytes converts bytes to human readable format
@@ -45,7 +47,9 @@ func GenerateFilename(originalFilename string, expiryTime time.Time) string {
 		originalExt = ".bin" // default extension if none
 	}
 
-	return fmt.Sprintf("%d%s", expiryTime.Unix(), originalExt)
+	uuid := uuid.New().String()
+
+	return fmt.Sprintf("%s_%d%s", uuid, expiryTime.Unix(), originalExt)
 }
 
 // GetFileExtension extracts file extension from filename
@@ -63,6 +67,11 @@ func GetFileExtension(filename string) string {
 
 // ParseTimestampFromFilename extracts unix timestamp from filename
 func ParseTimestampFromFilename(filename string) (int64, error) {
+	// Remove filename uuid prefix
+	if strings.Contains(filename, "_") {
+		filename = strings.Split(filename, "_")[1]
+	}
+
 	// Remove extension to get unix timestamp
 	filenameWithoutExt := filename
 	if ext := GetFileExtension(filename); ext != "" {
