@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} - TempFiles</title>
-    <meta name="description" content="Fast, secure temporary file sharing. Upload files up to 100MB that automatically expire after 1 hour.">
+    <meta name="description" content="Fast, secure temporary file sharing. Upload files up to {{.MaxFileSizeHuman}} that automatically expire after {{.FileExpiryHours}} hour{{if ne .FileExpiryHours 1}}s{{end}}.">
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📁</text></svg>">
@@ -34,7 +34,7 @@
             <div class="header">
                 <div class="logo">📁 TempFiles</div>
                 <div class="subtitle">Fast, secure temporary file sharing</div>
-                <p>Upload files up to 100MB that automatically expire after {{.FileExpiryHours}} hour{{if ne .FileExpiryHours 1}}s{{end}}</p>
+                <p>Upload files up to {{.MaxFileSizeHuman}} that automatically expire after {{.FileExpiryHours}} hour{{if ne .FileExpiryHours 1}}s{{end}}</p>
             </div>
             
             <!-- Alert Container -->
