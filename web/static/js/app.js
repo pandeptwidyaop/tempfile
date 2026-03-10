@@ -11,7 +11,12 @@ class TempFilesUI {
         this.fileInfo = document.querySelector('.file-info');
         this.alertContainer = document.querySelector('.alert');
         
-        this.maxFileSize = 100 * 1024 * 1024; // 100MB
+        // Read max file size from data attribute, fallback to 100MB
+        const uploadAreaEl = document.getElementById('uploadArea');
+        this.maxFileSize = uploadAreaEl?.dataset.maxFileSize 
+            ? parseInt(uploadAreaEl.dataset.maxFileSize, 10) 
+            : 100 * 1024 * 1024;
+        this.maxFileSizeHuman = uploadAreaEl?.dataset.maxFileSizeHuman || '100.0 MB';
         this.selectedFile = null;
         
         this.init();
@@ -209,7 +214,7 @@ class TempFilesUI {
         
         // Validate file size
         if (file.size > this.maxFileSize) {
-            this.showAlert('File size exceeds 100MB limit', 'error');
+            this.showAlert(`File size exceeds ${this.maxFileSizeHuman} limit`, 'error');
             return;
         }
         
