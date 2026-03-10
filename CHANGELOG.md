@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.2.2](https://github.com/pandeptwidyaop/tempfile/compare/v2.2.1...v2.2.2) (2026-03-10)
+
+### 🐛 Bug Fixes
+
+* use dynamic max file size in upload template ([d8f7e13](https://github.com/pandeptwidyaop/tempfile/commit/d8f7e133d54c88702abf22a16ac6155205333df7))
+
 ## [2.2.1](https://github.com/pandeptwidyaop/tempfile/compare/v2.2.0...v2.2.1) (2025-07-25)
 
 ### 🐛 Bug Fixes
