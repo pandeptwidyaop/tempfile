@@ -44,7 +44,7 @@
             <div class="card">
                 <form id="uploadForm" action="/" method="POST" enctype="multipart/form-data">
                     <!-- Upload Area -->
-                    <div class="upload-area" id="uploadArea">
+                    <div class="upload-area" id="uploadArea" data-max-file-size="{{.MaxFileSize}}" data-max-file-size-human="{{.MaxFileSizeHuman}}">
                         <div class="upload-icon">📁</div>
                         <div class="upload-text">Drop files here or click to browse</div>
                         <div class="upload-subtext">Maximum file size: {{.MaxFileSizeHuman}}</div>
