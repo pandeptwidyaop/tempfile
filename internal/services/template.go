@@ -121,6 +121,7 @@ func (s *TemplateService) RenderUploadPage(c *fiber.Ctx, baseURL string) error {
 		Title:            "Upload File",
 		Theme:            s.config.DefaultTheme,
 		FileExpiryHours:  s.config.FileExpiryHours,
+		MaxFileSize:      s.config.MaxFileSize,
 		MaxFileSizeHuman: s.formatBytes(s.config.MaxFileSize),
 		BaseURL:          baseURL,
 	}
