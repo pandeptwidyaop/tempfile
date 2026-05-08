@@ -1,0 +1,33 @@
+{{define "paste.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paste {{.PasteID}} - TempFiles</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+</head>
+<body data-theme="{{.Theme}}">
+    <button class="theme-toggle" title="Toggle theme">🌙</button>
+    <div class="container">
+        <div class="fade-in">
+            <div class="header">
+                <div class="logo">📝 Paste</div>
+                <div class="subtitle">Expires in {{.ExpiresIn}}</div>
+            </div>
+            <div class="card">
+                <div class="paste-toolbar">
+                    <button id="pasteCopyBtn" class="btn btn-secondary" data-content-id="pasteContent">Copy</button>
+                    <a class="btn btn-secondary" href="{{.PasteRawURL}}">Raw</a>
+                    <a class="btn" href="/">New paste</a>
+                </div>
+                <pre id="pasteContent" class="paste-content"><code>{{.PasteContent}}</code></pre>
+            </div>
+        </div>
+    </div>
+    <script src="/static/js/paste.js" defer></script>
+</body>
+</html>
+{{end}}
