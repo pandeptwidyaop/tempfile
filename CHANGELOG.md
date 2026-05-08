@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.3.0](https://github.com/pandeptwidyaop/tempfile/compare/v2.2.3...v2.3.0) (2026-05-08)
+
+### ✨ Features
+
+* add paste view template ([5f38fca](https://github.com/pandeptwidyaop/tempfile/commit/5f38fca1784899dbd50a067592e0ed75368c2788))
+* add paste.js for tab switching, copy, line numbers ([3bf0af0](https://github.com/pandeptwidyaop/tempfile/commit/3bf0af0651f6397c9869ee9db89d3e6571d1df9e))
+* add PasteHandler with create, view, and raw endpoints ([6dd70c1](https://github.com/pandeptwidyaop/tempfile/commit/6dd70c19a125db9d9d6e003ffd8d8355ad9fd156))
+* add PasteResponse model and paste fields to WebPageData ([68562bf](https://github.com/pandeptwidyaop/tempfile/commit/68562bf754a2ba2c2e2cf4392ad346736bd401a8))
+* add PasteService for text sharing ([90334ff](https://github.com/pandeptwidyaop/tempfile/commit/90334ff376c6a48b780a2ff31530fb57e49a4f05))
+* add RenderPastePage helper to template service ([9214dcb](https://github.com/pandeptwidyaop/tempfile/commit/9214dcb59b480342f7c2035b7de08749029407c2))
+* add Share Text tab to upload page ([170dce5](https://github.com/pandeptwidyaop/tempfile/commit/170dce55663dd458b64a4ee21ca9c79679cc93b0))
+* add styles for paste tab and paste view ([ca160fc](https://github.com/pandeptwidyaop/tempfile/commit/ca160fcf7de70c4918421668c3f71ad001ecc694))
+* cleanup also scans pastes/ subdirectory ([7c3e6d0](https://github.com/pandeptwidyaop/tempfile/commit/7c3e6d0b1bc2ce4dcf3e8a050ceda72dfea42f07))
+* redesign paste view with share-link section, raw download, and clipboard fallback ([d52c5fe](https://github.com/pandeptwidyaop/tempfile/commit/d52c5fea3e0f46e565ce37eb8352728e16c6d49f))
+* wire paste service, handler, and routes ([79bf1b0](https://github.com/pandeptwidyaop/tempfile/commit/79bf1b0d13dbe5d319f43edff2e94a5c62cc7fbc))
+
+### 🐛 Bug Fixes
+
+* trigger build ([86d03be](https://github.com/pandeptwidyaop/tempfile/commit/86d03beed8a21d10d9e8067be529c7f24abef5b4))
+
+### 📚 Documentation
+
+* document text-sharing endpoints in README ([a85a460](https://github.com/pandeptwidyaop/tempfile/commit/a85a460cbf09da47a2606d0adb4256a7271acd91))
+
 ## [2.2.3](https://github.com/pandeptwidyaop/tempfile/compare/v2.2.2...v2.2.3) (2026-03-10)
 
 ### 🐛 Bug Fixes
