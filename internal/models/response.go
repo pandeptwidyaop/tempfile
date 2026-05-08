@@ -32,6 +32,7 @@ type WebPageData struct {
 	Title            string
 	Theme            string
 	FileExpiryHours  int
+	MaxFileSize      int64
 	MaxFileSizeHuman string
 	BaseURL          string
 	Filename         string
